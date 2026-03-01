@@ -53,7 +53,7 @@ func (c *ControlCache) Get(ctx context.Context, key string, controlURL string, h
 		return entry.body, entry.status, nil
 	}
 
-	// Cache miss or expired — fetch.
+	// Cache miss or expired - fetch.
 	if c.limiter != nil {
 		if err := c.limiter.Wait(ctx, controlURL); err != nil {
 			return "", 0, err

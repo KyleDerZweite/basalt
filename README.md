@@ -100,4 +100,4 @@ This tool queries only publicly accessible URLs. No authentication bypass, no pr
 
 ## License
 
-[AGPLv3](LICENSE) -- if you use Basalt in a network service, you must share your source code.
+[AGPLv3](LICENSE): if you use Basalt in a network service, you must share your source code.

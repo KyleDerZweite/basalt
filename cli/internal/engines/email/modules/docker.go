@@ -40,7 +40,7 @@ func (d *Docker) Check(ctx context.Context, addr string, client *httpclient.Clie
 		return *r
 	}
 
-	// Parse error response — if email is taken, the error message says so.
+	// Parse error response - if email is taken, the error message says so.
 	var data map[string]interface{}
 	if err := json.Unmarshal([]byte(resp.Body), &data); err != nil {
 		return email.ModuleResult{Err: fmt.Errorf("parsing response: %w", err)}

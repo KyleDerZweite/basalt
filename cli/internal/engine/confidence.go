@@ -6,13 +6,13 @@ import (
 	"strings"
 )
 
-// Signal weights — these sum to 1.0.
+// Signal weights - these sum to 1.0.
 const (
-	WeightHTTPStatus            = 0.15
-	WeightBodyPresenceMatch     = 0.25
-	WeightBodyAbsenceCheck      = 0.20
+	WeightHTTPStatus             = 0.15
+	WeightBodyPresenceMatch      = 0.25
+	WeightBodyAbsenceCheck       = 0.20
 	WeightContentDifferentiation = 0.30
-	WeightNoRedirect            = 0.10
+	WeightNoRedirect             = 0.10
 )
 
 // DefaultConfidenceThreshold is the minimum confidence to consider a match.
@@ -37,17 +37,17 @@ type CheckContext struct {
 }
 
 // ComputeConfidence calculates a weighted confidence score from multiple signals.
-// The content differentiation signal is the key innovation — it compares the target
+// The content differentiation signal is the key innovation - it compares the target
 // response against a control (nonexistent user) response to detect soft-404 pages.
 func ComputeConfidence(ctx CheckContext) (float64, SignalScores) {
 	var scores SignalScores
 
-	// Signal 1: HTTP Status — does the status match what we expect for "exists"?
+	// Signal 1: HTTP Status - does the status match what we expect for "exists"?
 	if ctx.TargetStatus == ctx.ExpectedStatus {
 		scores.HTTPStatus = 1.0
 	}
 
-	// Signal 2: Body Presence Match — do expected strings appear in the body?
+	// Signal 2: Body Presence Match - do expected strings appear in the body?
 	if len(ctx.PresenceStrings) > 0 {
 		matched := 0
 		for _, s := range ctx.PresenceStrings {
@@ -61,7 +61,7 @@ func ComputeConfidence(ctx CheckContext) (float64, SignalScores) {
 		scores.BodyPresenceMatch = scores.HTTPStatus
 	}
 
-	// Signal 3: Body Absence Check — are error/404 strings absent from body?
+	// Signal 3: Body Absence Check - are error/404 strings absent from body?
 	if len(ctx.AbsenceStrings) > 0 {
 		absent := 0
 		for _, s := range ctx.AbsenceStrings {
@@ -75,7 +75,7 @@ func ComputeConfidence(ctx CheckContext) (float64, SignalScores) {
 		scores.BodyAbsenceCheck = 1.0
 	}
 
-	// Signal 4: Content Differentiation — THE key signal.
+	// Signal 4: Content Differentiation - THE key signal.
 	// Compare target body against control body to detect soft-404 pages.
 	// If both responses are identical or near-identical, this is a soft 404.
 	if ctx.ControlBody != "" {
@@ -88,7 +88,7 @@ func ComputeConfidence(ctx CheckContext) (float64, SignalScores) {
 		scores.ContentDifferentiation = scores.HTTPStatus
 	}
 
-	// Signal 5: No Redirect — did the URL stay the same?
+	// Signal 5: No Redirect - did the URL stay the same?
 	if ctx.TargetFinalURL == "" || ctx.TargetFinalURL == ctx.TargetURL {
 		scores.NoRedirect = 1.0
 	}
@@ -116,7 +116,7 @@ func ComputeConfidence(ctx CheckContext) (float64, SignalScores) {
 	statusPenalty := 1.0
 	if scores.HTTPStatus == 0 && ctx.ExpectedStatus >= 200 && ctx.ExpectedStatus < 300 {
 		if ctx.TargetStatus >= 400 {
-			// Hard error: 404, 403, 410, 500, etc. — severely penalize.
+			// Hard error: 404, 403, 410, 500, etc. - severely penalize.
 			statusPenalty = 0.4
 		}
 	}

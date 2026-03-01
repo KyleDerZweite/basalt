@@ -26,8 +26,8 @@ func (a *Adobe) Check(ctx context.Context, addr string, client *httpclient.Clien
 		"https://auth.services.adobe.com/signin/v2/users/accounts",
 		strings.NewReader(body),
 		map[string]string{
-			"Content-Type": "application/json",
-			"Accept":       "application/json",
+			"Content-Type":   "application/json",
+			"Accept":         "application/json",
 			"X-IMS-ClientId": "adobedotcom2",
 		})
 	if err != nil {
@@ -47,12 +47,12 @@ func (a *Adobe) Check(ctx context.Context, addr string, client *httpclient.Clien
 		return email.ModuleResult{Err: fmt.Errorf("unexpected status %d", resp.StatusCode)}
 	}
 
-	// Parse the account info — may contain recovery hints.
+	// Parse the account info - may contain recovery hints.
 	var accounts []struct {
-		Type              string `json:"type"`
+		Type               string `json:"type"`
 		AuthenticationType string `json:"authenticationType"`
-		EmailHint         string `json:"emailHint"`
-		PhoneHint         string `json:"phoneHint"`
+		EmailHint          string `json:"emailHint"`
+		PhoneHint          string `json:"phoneHint"`
 	}
 	if err := json.Unmarshal([]byte(resp.Body), &accounts); err != nil {
 		// Single object response.

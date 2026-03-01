@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Basalt — Unified OSINT digital footprint discovery tool.
+// Basalt - Unified OSINT digital footprint discovery tool.
 // Copyright (C) 2026 Kyle
 //
 // This program is free software: you can redistribute it and/or modify

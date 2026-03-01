@@ -2079,7 +2079,7 @@ sites:
         method: GET
         expected_status: 200
         presence_strings:
-            - — Tauck Community
+            - - Tauck Community
       test_accounts:
         claimed: tashager
         unclaimed: noonewouldeverusethis7
@@ -16737,7 +16737,7 @@ sites:
         method: GET
         expected_status: 200
         absence_strings:
-            - 404 — Not found
+            - 404 - Not found
       username_regex: ^[A-Za-z0-9_-]{3,16}$
       test_accounts:
         claimed: blue
@@ -23479,7 +23479,7 @@ sites:
         presence_strings:
             - tv-profile
         absence_strings:
-            - <title>Page not found — TradingView</title>
+            - <title>Page not found - TradingView</title>
       test_accounts:
         claimed: blue
         unclaimed: noonewouldeverusethis7
@@ -27327,7 +27327,7 @@ sites:
         presence_strings:
             - itemprop="name"
         absence_strings:
-            - <title>404 — Страница не найдена</title>
+            - <title>404 - Страница не найдена</title>
       test_accounts:
         claimed: seryjkot
         unclaimed: zzz_basalt_nonexistent_user_zzz
@@ -29962,9 +29962,9 @@ sites:
         method: GET
         expected_status: 200
         presence_strings:
-            - — Люди — Risk.ru
+            - - Люди - Risk.ru
         absence_strings:
-            - 404 — Risk.ru
+            - 404 - Risk.ru
       test_accounts:
         claimed: igor1
         unclaimed: zzz_basalt_nonexistent_user_zzz

@@ -19,7 +19,7 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:   "basalt",
-	Short: "Basalt — Unified OSINT digital footprint discovery",
+	Short: "Basalt - Unified OSINT digital footprint discovery",
 	Long: `Basalt is an open-source intelligence tool for discovering your digital footprint.
 It checks a username, email, or phone number across thousands of platforms and
 builds a relationship graph of all discovered accounts.

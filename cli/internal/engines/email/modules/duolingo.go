@@ -13,7 +13,7 @@ import (
 )
 
 // Duolingo checks if an email is registered on Duolingo via the
-// login endpoint — a non-existent email returns a specific error.
+// login endpoint - a non-existent email returns a specific error.
 type Duolingo struct{}
 
 func (d *Duolingo) Name() string     { return "Duolingo" }

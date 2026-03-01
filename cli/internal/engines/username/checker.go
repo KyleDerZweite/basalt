@@ -126,7 +126,7 @@ func New(client *httpclient.Client, threshold float64, opts ...Option) *Engine {
 }
 
 func (e *Engine) Name() string                 { return "username-checker" }
-func (e *Engine) SeedTypes() []engine.SeedType  { return []engine.SeedType{engine.SeedUsername} }
+func (e *Engine) SeedTypes() []engine.SeedType { return []engine.SeedType{engine.SeedUsername} }
 
 // Check runs the username against all sites concurrently and streams results.
 func (e *Engine) Check(ctx context.Context, seed engine.Seed, results chan<- engine.Result) {
@@ -330,7 +330,7 @@ func (e *Engine) fetchProbeBody(ctx context.Context, site sitedb.SiteDefinition,
 
 	probeResp, err := e.client.Do(ctx, probeURL, site.Check.Headers)
 	if err != nil || probeResp.StatusCode != 200 {
-		// Some APIs are case-sensitive — retry with lowercase.
+		// Some APIs are case-sensitive - retry with lowercase.
 		probeLower := strings.ReplaceAll(site.ProbeURL, "{username}", strings.ToLower(seedValue))
 		if probeLower != probeURL {
 			_ = e.waitRateLimit(ctx, probeLower)

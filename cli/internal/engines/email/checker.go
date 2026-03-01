@@ -66,7 +66,7 @@ func New(client *httpclient.Client, threshold float64, opts ...Option) *Engine {
 }
 
 func (e *Engine) Name() string                 { return "email-checker" }
-func (e *Engine) SeedTypes() []engine.SeedType  { return []engine.SeedType{engine.SeedEmail} }
+func (e *Engine) SeedTypes() []engine.SeedType { return []engine.SeedType{engine.SeedEmail} }
 
 // Check runs all registered modules concurrently and streams results.
 func (e *Engine) Check(ctx context.Context, seed engine.Seed, results chan<- engine.Result) {
@@ -129,7 +129,7 @@ func (e *Engine) runModule(ctx context.Context, seed engine.Seed, mod Module) en
 		return result
 	}
 
-	// Inconclusive — skip.
+	// Inconclusive - skip.
 	if modResult.Exists == nil {
 		result.Err = fmt.Errorf("%s: inconclusive", mod.Name())
 		return result

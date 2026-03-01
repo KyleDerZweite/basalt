@@ -72,7 +72,7 @@ func (p *ProxyPool) Transport() http.RoundTripper {
 		Proxy: func(req *http.Request) (*url.URL, error) {
 			return p.next(), nil
 		},
-		// For SOCKS5, we handle it in the proxy function — Go's
+		// For SOCKS5, we handle it in the proxy function - Go's
 		// http.Transport handles socks5:// proxy URLs natively.
 	}
 }

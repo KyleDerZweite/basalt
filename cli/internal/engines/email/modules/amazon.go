@@ -71,7 +71,7 @@ func (a *Amazon) Check(ctx context.Context, addr string, client *httpclient.Clie
 		return email.ModuleResult{Exists: &exists, Method: "password_recovery"}
 	}
 
-	// Captcha block — inconclusive.
+	// Captcha block - inconclusive.
 	if strings.Contains(body, "captcha") {
 		return email.ModuleResult{Err: fmt.Errorf("captcha required")}
 	}

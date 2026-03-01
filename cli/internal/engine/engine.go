@@ -17,7 +17,7 @@ const (
 	SeedDomain   SeedType = "domain"
 )
 
-// Seed is the input to an engine — a single data point to investigate.
+// Seed is the input to an engine - a single data point to investigate.
 type Seed struct {
 	// Value is the raw input (e.g., "johndoe", "john@example.com").
 	Value string

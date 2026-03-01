@@ -114,7 +114,7 @@ func setupShutdown() (context.Context, context.CancelFunc) {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-sigCh
-		fmt.Fprintf(os.Stderr, "\nInterrupted — finishing in-flight requests (press Ctrl+C again to force quit)...\n")
+		fmt.Fprintf(os.Stderr, "\nInterrupted - finishing in-flight requests (press Ctrl+C again to force quit)...\n")
 		cancel()
 		<-sigCh
 		fmt.Fprintf(os.Stderr, "\nForce quit.\n")
@@ -211,7 +211,7 @@ func runScanLoop(ctx context.Context, g *graph.Graph, registry *engine.Registry,
 		}
 
 		if depth > 0 {
-			fmt.Fprintf(os.Stderr, "\n--- Pivot depth %d: %d new seeds ---\n", depth, len(seedQueue))
+			fmt.Fprintf(os.Stderr, "\nPivot depth %d: %d new seeds\n", depth, len(seedQueue))
 		} else {
 			fmt.Fprintf(os.Stderr, "Scanning %s %q across platforms...\n", seed.Type, seed.Value)
 		}
