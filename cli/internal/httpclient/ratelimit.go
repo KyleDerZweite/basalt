@@ -4,8 +4,10 @@ package httpclient
 
 import (
 	"context"
+	"math/rand"
 	"net/url"
 	"sync"
+	"time"
 
 	"golang.org/x/time/rate"
 )
@@ -15,6 +17,7 @@ type DomainRateLimiter struct {
 	mu       sync.RWMutex
 	limiters map[string]*rate.Limiter
 	global   *rate.Limiter
+	jitter   time.Duration
 }
 
 // NewDomainRateLimiter creates a rate limiter with default global limits.
@@ -22,6 +25,7 @@ func NewDomainRateLimiter(rps float64, burst int) *DomainRateLimiter {
 	return &DomainRateLimiter{
 		limiters: make(map[string]*rate.Limiter),
 		global:   rate.NewLimiter(rate.Limit(rps), burst),
+		jitter:   50 * time.Millisecond,
 	}
 }
 
@@ -33,6 +37,7 @@ func (d *DomainRateLimiter) SetDomainLimit(domain string, rps float64, burst int
 }
 
 // Wait blocks until the rate limiter for the given URL's domain allows the request.
+// Adds a small random jitter to avoid burst patterns that look bot-like.
 func (d *DomainRateLimiter) Wait(ctx context.Context, rawURL string) error {
 	domain := extractDomain(rawURL)
 
@@ -44,7 +49,21 @@ func (d *DomainRateLimiter) Wait(ctx context.Context, rawURL string) error {
 		limiter = d.global
 	}
 
-	return limiter.Wait(ctx)
+	if err := limiter.Wait(ctx); err != nil {
+		return err
+	}
+
+	// Jitter: small random delay to break burst patterns.
+	if d.jitter > 0 {
+		j := time.Duration(rand.Int63n(int64(d.jitter)))
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(j):
+		}
+	}
+
+	return nil
 }
 
 // ExtractDomain returns the hostname from a URL string.

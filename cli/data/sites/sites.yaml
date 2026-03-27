@@ -2079,7 +2079,7 @@ sites:
         method: GET
         expected_status: 200
         presence_strings:
-            - - Tauck Community
+            - "- Tauck Community"
       test_accounts:
         claimed: tashager
         unclaimed: noonewouldeverusethis7
@@ -29962,7 +29962,7 @@ sites:
         method: GET
         expected_status: 200
         presence_strings:
-            - - Люди - Risk.ru
+            - "- Люди - Risk.ru"
         absence_strings:
             - 404 - Risk.ru
       test_accounts:

@@ -16,7 +16,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"regexp"
 	"strings"
 	"sync"
 
@@ -170,9 +169,8 @@ func (e *Engine) filterSites(username string) []sitedb.SiteDefinition {
 		if site.Disabled || !containsSeedType(site.SeedTypes, "username") {
 			continue
 		}
-		if site.UsernameRegex != "" {
-			re, err := regexp.Compile(site.UsernameRegex)
-			if err == nil && !re.MatchString(username) {
+		if site.UsernameRegexCompiled != nil {
+			if !site.UsernameRegexCompiled.MatchString(username) {
 				continue
 			}
 		}

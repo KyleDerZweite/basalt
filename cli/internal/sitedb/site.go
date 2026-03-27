@@ -2,6 +2,8 @@
 
 package sitedb
 
+import "regexp"
+
 // SiteFile represents a YAML file containing one or more site definitions.
 type SiteFile struct {
 	Sites []SiteDefinition `yaml:"sites"`
@@ -35,6 +37,10 @@ type SiteDefinition struct {
 	// UsernameRegex is an optional regex to reject invalid usernames before
 	// making any HTTP requests.
 	UsernameRegex string `yaml:"username_regex,omitempty"`
+
+	// UsernameRegexCompiled is the precompiled version of UsernameRegex.
+	// Populated during loading, not serialized.
+	UsernameRegexCompiled *regexp.Regexp `yaml:"-"`
 
 	// TestAccounts provides known-existent and known-nonexistent accounts
 	// for self-validation and dual-request control checks.

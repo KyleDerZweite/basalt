@@ -18,7 +18,11 @@ type Graph struct {
 
 	Meta Meta `json:"meta"`
 
-	edgeCounter atomic.Int64
+	edgeCounter    atomic.Int64
+	sitesChecked   atomic.Int64
+	accountsFound  atomic.Int64
+	pivotsExecuted atomic.Int64
+	errorCount     atomic.Int64
 }
 
 // Meta contains scan metadata for the output.
@@ -27,7 +31,7 @@ type Meta struct {
 	ScanID       string    `json:"scan_id"`
 	StartedAt    time.Time `json:"started_at"`
 	CompletedAt  time.Time `json:"completed_at,omitempty"`
-	DurationSecs float64  `json:"duration_seconds,omitempty"`
+	DurationSecs float64   `json:"duration_seconds,omitempty"`
 	InitialSeeds []SeedRef `json:"initial_seeds"`
 	Config       Config    `json:"config"`
 	Stats        Stats     `json:"stats"`
@@ -87,36 +91,34 @@ func (g *Graph) NextEdgeID() int {
 
 // IncrSitesChecked atomically increments the sites checked counter.
 func (g *Graph) IncrSitesChecked() {
-	g.mu.Lock()
-	g.Meta.Stats.SitesChecked++
-	g.mu.Unlock()
+	g.sitesChecked.Add(1)
 }
 
 // IncrAccountsFound atomically increments the accounts found counter.
 func (g *Graph) IncrAccountsFound() {
-	g.mu.Lock()
-	g.Meta.Stats.AccountsFound++
-	g.mu.Unlock()
+	g.accountsFound.Add(1)
 }
 
 // IncrErrors atomically increments the error counter.
 func (g *Graph) IncrErrors() {
-	g.mu.Lock()
-	g.Meta.Stats.Errors++
-	g.mu.Unlock()
+	g.errorCount.Add(1)
 }
 
 // IncrPivotsExecuted atomically increments the pivots executed counter.
 func (g *Graph) IncrPivotsExecuted() {
-	g.mu.Lock()
-	g.Meta.Stats.PivotsExecuted++
-	g.mu.Unlock()
+	g.pivotsExecuted.Add(1)
 }
 
 // AccountNodes returns all account nodes and the graph metadata.
 func (g *Graph) AccountNodes() ([]*Node, Meta) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
+
+	// Snapshot atomic counters into Meta.Stats for output.
+	g.Meta.Stats.SitesChecked = int(g.sitesChecked.Load())
+	g.Meta.Stats.AccountsFound = int(g.accountsFound.Load())
+	g.Meta.Stats.PivotsExecuted = int(g.pivotsExecuted.Load())
+	g.Meta.Stats.Errors = int(g.errorCount.Load())
 
 	var nodes []*Node
 	for _, n := range g.nodes {
@@ -138,6 +140,12 @@ type graphOutput struct {
 func (g *Graph) MarshalJSON() ([]byte, error) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
+
+	// Snapshot atomic counters into Meta.Stats for output.
+	g.Meta.Stats.SitesChecked = int(g.sitesChecked.Load())
+	g.Meta.Stats.AccountsFound = int(g.accountsFound.Load())
+	g.Meta.Stats.PivotsExecuted = int(g.pivotsExecuted.Load())
+	g.Meta.Stats.Errors = int(g.errorCount.Load())
 
 	// Convert map to sorted slice for deterministic output.
 	nodes := make([]*Node, 0, len(g.nodes))

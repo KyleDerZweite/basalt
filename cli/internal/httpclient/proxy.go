@@ -68,13 +68,11 @@ func LoadProxyFile(path string) ([]string, error) {
 
 // Transport returns an http.RoundTripper that rotates through proxies.
 func (p *ProxyPool) Transport() http.RoundTripper {
-	return &http.Transport{
-		Proxy: func(req *http.Request) (*url.URL, error) {
-			return p.next(), nil
-		},
-		// For SOCKS5, we handle it in the proxy function - Go's
-		// http.Transport handles socks5:// proxy URLs natively.
+	t := defaultTransport(defaultMaxConnsPerHost)
+	t.Proxy = func(req *http.Request) (*url.URL, error) {
+		return p.next(), nil
 	}
+	return t
 }
 
 // SOCKS5Transport returns an http.RoundTripper for a single SOCKS5 proxy.

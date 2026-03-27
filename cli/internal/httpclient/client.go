@@ -16,11 +16,14 @@ import (
 )
 
 const (
-	defaultTimeout    = 15 * time.Second
-	defaultUserAgent  = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-	maxBodySize       = 1 << 20 // 1 MB
-	defaultMaxRetries = 2
-	defaultRetryBase  = 1 * time.Second
+	defaultTimeout         = 15 * time.Second
+	defaultConnectTimeout  = 5 * time.Second
+	defaultUserAgent       = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+	maxBodySize            = 1 << 20 // 1 MB
+	defaultMaxRetries      = 2
+	defaultRetryBase       = 1 * time.Second
+	defaultMaxIdleConns    = 200
+	defaultMaxConnsPerHost = 20
 )
 
 // Response holds the relevant fields from an HTTP response.
@@ -29,14 +32,17 @@ type Response struct {
 	Body         string
 	FinalURL     string // after redirects
 	ResponseTime time.Duration
+	RetryAfter   time.Duration // parsed from Retry-After header, 0 if absent
 }
 
 // Client is a wrapped HTTP client with configurable timeout, User-Agent, and retries.
 type Client struct {
-	http       *http.Client
-	userAgent  string
-	maxRetries int
-	retryBase  time.Duration
+	http           *http.Client
+	userAgent      string
+	maxRetries     int
+	retryBase      time.Duration
+	connectTimeout time.Duration
+	dnsCache       *DNSCache
 }
 
 // Option configures the Client.
@@ -70,6 +76,42 @@ func WithRetries(n int) Option {
 	}
 }
 
+// WithConnectTimeout sets the connection establishment timeout.
+func WithConnectTimeout(d time.Duration) Option {
+	return func(c *Client) {
+		c.connectTimeout = d
+	}
+}
+
+// WithDNSCache enables DNS caching for the client.
+func WithDNSCache(cache *DNSCache) Option {
+	return func(c *Client) {
+		c.dnsCache = cache
+		// If transport is set, update its DialContext.
+		if t, ok := c.http.Transport.(*http.Transport); ok {
+			t.DialContext = cache.DialContext
+		}
+	}
+}
+
+// defaultTransport returns a tuned HTTP transport with proper connection pooling.
+func defaultTransport(concurrency int) *http.Transport {
+	dialer := &net.Dialer{
+		Timeout:   defaultConnectTimeout,
+		KeepAlive: 30 * time.Second,
+	}
+	return &http.Transport{
+		DialContext:           dialer.DialContext,
+		MaxIdleConns:          defaultMaxIdleConns,
+		MaxIdleConnsPerHost:   concurrency,
+		MaxConnsPerHost:       concurrency,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		ForceAttemptHTTP2:     true,
+	}
+}
+
 // New creates a new HTTP client with the given options.
 func New(opts ...Option) *Client {
 	c := &Client{
@@ -81,10 +123,12 @@ func New(opts ...Option) *Client {
 				}
 				return nil
 			},
+			Transport: defaultTransport(defaultMaxConnsPerHost),
 		},
-		userAgent:  defaultUserAgent,
-		maxRetries: defaultMaxRetries,
-		retryBase:  defaultRetryBase,
+		userAgent:      defaultUserAgent,
+		maxRetries:     defaultMaxRetries,
+		retryBase:      defaultRetryBase,
+		connectTimeout: defaultConnectTimeout,
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -143,6 +187,18 @@ func (c *Client) DoRequest(ctx context.Context, method, url string, body io.Read
 		// Retry on 429 (rate limited) and 5xx (server errors).
 		if (resp.StatusCode == 429 || resp.StatusCode >= 500) && attempt < c.maxRetries {
 			lastErr = fmt.Errorf("HTTP %d from %s", resp.StatusCode, url)
+
+			// Respect Retry-After header if present.
+			if resp.RetryAfter > 0 {
+				slog.Debug("retrying after Retry-After", "url", url, "delay", resp.RetryAfter)
+				select {
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				case <-time.After(resp.RetryAfter):
+				}
+				continue
+			}
+
 			continue
 		}
 
@@ -185,6 +241,7 @@ func (c *Client) doOnce(ctx context.Context, method, url string, body io.Reader,
 		Body:         string(respBytes),
 		FinalURL:     resp.Request.URL.String(),
 		ResponseTime: time.Since(start),
+		RetryAfter:   parseRetryAfter(resp.Header.Get("Retry-After")),
 	}, nil
 }
 
@@ -202,4 +259,23 @@ func isRetryableError(err error) bool {
 		return true
 	}
 	return false
+}
+
+// parseRetryAfter parses a Retry-After header value (seconds or HTTP date).
+func parseRetryAfter(raw string) time.Duration {
+	if raw == "" {
+		return 0
+	}
+	// Try integer seconds first.
+	if secs, err := time.ParseDuration(raw + "s"); err == nil && secs > 0 {
+		return secs
+	}
+	// Try HTTP date format.
+	if t, err := time.Parse(http.TimeFormat, raw); err == nil {
+		d := time.Until(t)
+		if d > 0 {
+			return d
+		}
+	}
+	return 0
 }

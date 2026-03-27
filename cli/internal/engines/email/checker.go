@@ -116,6 +116,15 @@ func (e *Engine) runModule(ctx context.Context, seed engine.Seed, mod Module) en
 		Category:   mod.Category(),
 	}
 
+	// Rate limit before each module check.
+	if e.rateLimiter != nil {
+		// Use module name as a pseudo-URL to route through the global limiter.
+		if err := e.rateLimiter.Wait(ctx, "https://"+mod.Name()+".com"); err != nil {
+			result.Err = fmt.Errorf("rate limit wait: %w", err)
+			return result
+		}
+	}
+
 	modResult := mod.Check(ctx, seed.Value, e.client)
 
 	if modResult.Err != nil {

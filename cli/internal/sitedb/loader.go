@@ -4,8 +4,10 @@ package sitedb
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -53,6 +55,17 @@ func LoadSites(dirs ...string) ([]SiteDefinition, error) {
 				if site.Disabled {
 					continue
 				}
+
+				// Precompile username regex.
+				if site.UsernameRegex != "" {
+					re, err := regexp.Compile(site.UsernameRegex)
+					if err != nil {
+						slog.Warn("invalid username_regex, skipping site", "site", site.Name, "regex", site.UsernameRegex, "error", err)
+						continue
+					}
+					site.UsernameRegexCompiled = re
+				}
+
 				nameKey := strings.ToLower(site.Name)
 				urlKey := strings.ToLower(site.URLTemplate)
 				if _, dup := seenName[nameKey]; dup {

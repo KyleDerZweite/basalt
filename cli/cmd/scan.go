@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"time"
 
@@ -137,6 +138,10 @@ func buildHTTPStack() (*httpclient.Client, *httpclient.DomainRateLimiter, error)
 		}
 		clientOpts = append(clientOpts, httpclient.WithTransport(transport))
 		fmt.Fprintf(os.Stderr, "Using %d proxy(ies)\n", proxyCount)
+	} else {
+		// DNS cache only when not using proxy (proxy resolves DNS on its end).
+		dnsCache := httpclient.NewDNSCache(5 * time.Minute)
+		clientOpts = append(clientOpts, httpclient.WithDNSCache(dnsCache))
 	}
 
 	client := httpclient.New(clientOpts...)
@@ -216,23 +221,52 @@ func runScanLoop(ctx context.Context, g *graph.Graph, registry *engine.Registry,
 			fmt.Fprintf(os.Stderr, "Scanning %s %q across platforms...\n", seed.Type, seed.Value)
 		}
 
+		// Process seeds at this depth level with bounded concurrency.
+		// At depth 0 there's only 1 seed; at deeper levels there can be many.
+		maxParallel := 1
+		if depth > 0 && len(seedQueue) > 1 {
+			maxParallel = min(flagConcurrency/4, len(seedQueue))
+			if maxParallel < 2 {
+				maxParallel = 2
+			}
+		}
+
+		var seedWg sync.WaitGroup
+		seedSem := make(chan struct{}, maxParallel)
+
 		for _, currentSeed := range seedQueue {
 			if ctx.Err() != nil {
 				break
 			}
 
-			engines := registry.EnginesFor(currentSeed.Type)
-			if len(engines) == 0 {
-				slog.Debug("no engines for seed type", "type", currentSeed.Type, "value", currentSeed.Value)
-				continue
-			}
+			seedWg.Add(1)
+			seedSem <- struct{}{}
 
-			if depth > 0 {
-				fmt.Fprintf(os.Stderr, "  Scanning %s %q...\n", currentSeed.Type, currentSeed.Value)
-			}
+			go func(cs engine.Seed) {
+				defer seedWg.Done()
+				defer func() { <-seedSem }()
 
-			runEngines(ctx, g, engines, currentSeed, pivotCtrl)
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+
+				engines := registry.EnginesFor(cs.Type)
+				if len(engines) == 0 {
+					slog.Debug("no engines for seed type", "type", cs.Type, "value", cs.Value)
+					return
+				}
+
+				if depth > 0 {
+					fmt.Fprintf(os.Stderr, "  Scanning %s %q...\n", cs.Type, cs.Value)
+				}
+
+				runEngines(ctx, g, engines, cs, pivotCtrl)
+			}(currentSeed)
 		}
+
+		seedWg.Wait()
 
 		if !pivotCtrl.Enabled() {
 			break
@@ -244,7 +278,7 @@ func runScanLoop(ctx context.Context, g *graph.Graph, registry *engine.Registry,
 // runEngines executes all applicable engines for a seed and collects results into the graph.
 func runEngines(ctx context.Context, g *graph.Graph, engines []engine.Engine, seed engine.Seed, pivotCtrl *pivotpkg.Controller) {
 	for _, eng := range engines {
-		resultsCh := make(chan engine.Result, 200)
+		resultsCh := make(chan engine.Result, 500)
 		go eng.Check(ctx, seed, resultsCh)
 
 		for result := range resultsCh {
