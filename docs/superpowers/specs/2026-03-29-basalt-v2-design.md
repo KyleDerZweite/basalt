@@ -37,7 +37,7 @@ Walker (async dispatch loop)
   |
   +-- Graph (thread-safe node/edge store)
   |
-  +-- HTTP Client (retries, rate limiting, proxy, DNS cache)
+  +-- HTTP Client (retries, per-domain rate limiting, proxy, DNS cache)
   |
   v
 Output (table to terminal, JSON/CSV to file)
@@ -93,6 +93,8 @@ username, email, domain, phone, full_name,
 account, organization, ip, avatar_url, website
 ```
 
+The `account` type is platform-agnostic. The platform is encoded in the node ID (`account:github:kyle`) and in the `site_name` property, not in the type. This keeps the type system small and avoids proliferating types like `github_account`, `reddit_account`, etc.
+
 ### Node properties
 
 - `source_module` - which module created this node
@@ -116,6 +118,14 @@ account, organization, ip, avatar_url, website
 ### Node merging
 
 When two modules discover the same entity (e.g., both Gravatar and GitHub find kyle@example.com), the graph deduplicates by node ID. The second discovery adds a new edge (different source_module) to the existing node. An entity confirmed by multiple modules naturally has more edges, which signals higher confidence.
+
+### Edge policy
+
+Edges are NOT deduplicated. If two modules both confirm the same relationship (e.g., both GitHub and Keybase confirm username -> email), both edges are kept with their respective `source_module` tags. Multiple edges between the same nodes represent converging evidence and are valuable for confidence assessment.
+
+### Concurrency and locking
+
+The graph uses a single `sync.RWMutex` for all mutations. At the target concurrency of 5, lock hold time for `AddNode` (map insert) and `AddEdge` (slice append) is sub-microsecond, making contention negligible. Node-level locking would add complexity without measurable benefit at this scale. If concurrency requirements grow significantly (50+), this can be revisited.
 
 ### Changes from current graph package
 
@@ -171,6 +181,7 @@ dispatch(node):
 ### Key properties
 
 - **Fully async**: no wave barriers. GitHub returns fast? Its discoveries trigger WHOIS immediately while Gravatar is still responding.
+- **Module-level timeout**: the walker wraps each `Extract()` call with `context.WithTimeout(ctx, timeout)` where timeout comes from the `--timeout` flag (default 10s). This bounds the entire module execution (HTTP requests + parsing), not just individual network calls. The HTTP client's own timeout serves as an inner bound on individual requests.
 - **Dedup at dispatch level**: processed map tracks "module:node" combos to prevent duplicate work. Graph-level dedup handles duplicate data.
 - **Termination**: inflight WaitGroup hits zero when all dispatched goroutines complete and no new pivotable nodes were produced.
 - **Graceful shutdown**: context cancellation on Ctrl+C. In-flight goroutines finish current request, walker stops dispatching, outputs partial graph.
