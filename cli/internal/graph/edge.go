@@ -8,6 +8,10 @@ import "fmt"
 const (
 	EdgeTypeDiscoveredOn  = "discovered_on"
 	EdgeTypeExtractedSeed = "extracted_seed"
+	EdgeTypeOwns          = "owns"
+	EdgeTypeMentions      = "mentions"
+	EdgeTypeResolvesTo    = "resolves_to"
+	EdgeTypeLinkedTo      = "linked_to"
 )
 
 // Edge represents a directed relationship between two nodes.

@@ -9,8 +9,14 @@ import (
 
 // Node types.
 const (
-	NodeTypeSeed    = "seed"
-	NodeTypeAccount = "account"
+	NodeTypeSeed         = "seed"
+	NodeTypeAccount      = "account"
+	NodeTypeUsername     = "username"
+	NodeTypeEmail        = "email"
+	NodeTypeDomain       = "domain"
+	NodeTypeIP           = "ip"
+	NodeTypeOrganization = "organization"
+	NodeTypePhone        = "phone"
 )
 
 // Node represents an entity in the intelligence graph.
@@ -73,4 +79,19 @@ func SeedNodeID(seedType, value string) string {
 // AccountNodeID generates a deterministic node ID for an account.
 func AccountNodeID(siteName, seedValue string) string {
 	return fmt.Sprintf("account:%s:%s", strings.ToLower(siteName), strings.ToLower(seedValue))
+}
+
+// Seed represents a seed entity for scanning.
+type Seed struct {
+	Type  string
+	Value string
+}
+
+// ParseSeed parses a seed string in format "type:value".
+func ParseSeed(s string) (Seed, error) {
+	parts := strings.SplitN(s, ":", 2)
+	if len(parts) != 2 {
+		return Seed{}, fmt.Errorf("invalid seed format: %s", s)
+	}
+	return Seed{Type: parts[0], Value: parts[1]}, nil
 }
