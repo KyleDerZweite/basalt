@@ -67,9 +67,7 @@ func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclie
 	domain := node.Label
 	apiURL := fmt.Sprintf("%s/domain/%s", m.baseURL, url.PathEscape(domain))
 
-	resp, err := client.Do(ctx, apiURL, map[string]string{
-		"Accept": "application/rdap+json",
-	})
+	resp, err := client.Do(ctx, apiURL, rdapHeaders())
 	if err != nil {
 		return nil, nil, fmt.Errorf("rdap request: %w", err)
 	}
@@ -152,9 +150,7 @@ func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclie
 
 func (m *Module) Verify(ctx context.Context, client *httpclient.Client) (modules.HealthStatus, string) {
 	apiURL := fmt.Sprintf("%s/domain/example.com", m.baseURL)
-	resp, err := client.Do(ctx, apiURL, map[string]string{
-		"Accept": "application/rdap+json",
-	})
+	resp, err := client.Do(ctx, apiURL, rdapHeaders())
 	if err != nil {
 		return modules.Offline, fmt.Sprintf("whois: %v", err)
 	}
@@ -186,6 +182,15 @@ func rdapSelfLink(links []rdapLink) string {
 		}
 	}
 	return ""
+}
+
+// rdapHeaders returns headers appropriate for RDAP requests.
+// rdap.org blocks browser-like User-Agents with 403.
+func rdapHeaders() map[string]string {
+	return map[string]string{
+		"Accept":     "application/rdap+json",
+		"User-Agent": "basalt/2.0",
+	}
 }
 
 // parseVCard extracts contact info from an RDAP vcardArray.
