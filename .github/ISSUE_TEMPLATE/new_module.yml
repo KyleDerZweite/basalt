@@ -1,0 +1,44 @@
+name: New Module
+description: Suggest a new platform or data source module
+labels: ["module"]
+body:
+  - type: input
+    id: platform
+    attributes:
+      label: Platform / Service
+      placeholder: "e.g. Mastodon, LinkedIn, Keybase"
+    validations:
+      required: true
+  - type: dropdown
+    id: input_type
+    attributes:
+      label: Input type
+      description: What seed type would this module accept?
+      options:
+        - username
+        - email
+        - domain
+        - multiple
+    validations:
+      required: true
+  - type: textarea
+    id: data_source
+    attributes:
+      label: How to query it
+      description: Public API, profile page scraping, etc. Include URLs or docs if available.
+    validations:
+      required: true
+  - type: textarea
+    id: extractable
+    attributes:
+      label: What data can be extracted?
+      description: "e.g. display name, avatar, bio, linked accounts, email"
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional notes
+      description: Rate limits, auth requirements, anti-scraping measures, etc.
+    validations:
+      required: false
