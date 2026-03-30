@@ -49,6 +49,14 @@ func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclie
 		return nil, nil, fmt.Errorf("parsing twitch HTML: %w", err)
 	}
 
+	title, hasTitle := doc.Find(`meta[property="og:title"]`).Attr("content")
+
+	// Twitch returns 200 for non-existent users with og:title="Twitch".
+	// A real profile has "{Username} - Twitch" in the title.
+	if !hasTitle || !strings.Contains(title, " - ") {
+		return nil, nil, nil
+	}
+
 	var nodes []*graph.Node
 	var edges []*graph.Edge
 
@@ -58,12 +66,10 @@ func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclie
 	nodes = append(nodes, account)
 	edges = append(edges, graph.NewEdge(0, node.ID, account.ID, graph.EdgeTypeHasAccount, "twitch"))
 
-	if title, exists := doc.Find(`meta[property="og:title"]`).Attr("content"); exists && title != "" {
-		nameNode := graph.NewNode(graph.NodeTypeFullName, title, "twitch")
-		nameNode.Confidence = 0.75
-		nodes = append(nodes, nameNode)
-		edges = append(edges, graph.NewEdge(0, account.ID, nameNode.ID, graph.EdgeTypeLinkedTo, "twitch"))
-	}
+	nameNode := graph.NewNode(graph.NodeTypeFullName, title, "twitch")
+	nameNode.Confidence = 0.75
+	nodes = append(nodes, nameNode)
+	edges = append(edges, graph.NewEdge(0, account.ID, nameNode.ID, graph.EdgeTypeLinkedTo, "twitch"))
 
 	if image, exists := doc.Find(`meta[property="og:image"]`).Attr("content"); exists && image != "" {
 		avatarNode := graph.NewNode(graph.NodeTypeAvatarURL, image, "twitch")

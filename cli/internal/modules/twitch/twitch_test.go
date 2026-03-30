@@ -16,7 +16,7 @@ import (
 const sampleHTML = `<!DOCTYPE html>
 <html>
 <head>
-<meta property="og:title" content="Test Streamer">
+<meta property="og:title" content="Test Streamer - Twitch">
 <meta property="og:description" content="Playing games all day">
 <meta property="og:image" content="https://example.com/twitch-avatar.jpg">
 </head>
@@ -67,8 +67,8 @@ func TestExtractFound(t *testing.T) {
 	if nodes[1].Type != graph.NodeTypeFullName {
 		t.Errorf("expected full_name node, got %s", nodes[1].Type)
 	}
-	if nodes[1].Label != "Test Streamer" {
-		t.Errorf("expected label 'Test Streamer', got %q", nodes[1].Label)
+	if nodes[1].Label != "Test Streamer - Twitch" {
+		t.Errorf("expected label 'Test Streamer - Twitch', got %q", nodes[1].Label)
 	}
 
 	// Check avatar node.

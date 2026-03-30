@@ -41,6 +41,11 @@ func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclie
 	if resp.StatusCode != 200 {
 		return nil, nil, fmt.Errorf("bento returned %d", resp.StatusCode)
 	}
+	// Bento redirects non-existent profiles to a different domain.
+	// If the final URL differs from what we requested, it's a redirect.
+	if resp.FinalURL != "" && resp.FinalURL != url {
+		return nil, nil, nil
+	}
 
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(resp.Body))
 	if err != nil {
