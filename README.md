@@ -1,10 +1,10 @@
 # Basalt
 
-Open-source OSINT tool for discovering your digital footprint. Checks a username or email across thousands of platforms and builds a relationship graph of all discovered accounts.
+Relational OSINT tool for discovering your digital footprint. Basalt runs 18 purpose-built modules against usernames, emails, and domains, then builds a relationship graph of everything it finds.
 
-Basalt is inspired by the broader OSINT tool ecosystem covered in our research, streamlined into one focused project.
+Unlike tools that spray thousands of sites with URL templates, Basalt uses per-module logic with structured API calls, HTML scraping, and module-level health checks. Each module scores its own confidence. No false positives from generic status code matching.
 
-**Designed for self-lookup and authorized security research only.** You must have explicit consent before scanning any identifier you don't own.
+**For self-lookup and authorized research only.** You must have explicit consent before scanning any identifier you don't own.
 
 ## Install
 
@@ -21,80 +21,94 @@ go build -o basalt .
 
 ## Usage
 
-Scan a username:
-
 ```bash
-basalt scan torvalds
-basalt scan torvalds --output table
-```
+# Scan a username
+basalt scan -u kylederzweite
 
-Scan an email (runs 16 email verification modules):
+# Scan an email
+basalt scan -e kyle@example.com
 
-```bash
-basalt scan user@example.com --output table
-```
+# Scan a domain
+basalt scan -d kylehub.dev
 
-Auto-pivoting (follows discovered emails/usernames to find more accounts):
+# Multiple seeds at once
+basalt scan -u kyle -e kyle@example.com -d kylehub.dev
 
-```bash
-basalt scan torvalds --max-pivot-depth 2
-```
+# Export results
+basalt scan -u kyle --export json --export csv
 
-Import upstream site definitions:
-
-```bash
-basalt import maigret path/to/maigret/resources/data.json
-basalt import sherlock path/to/sherlock/sherlock_project/resources/data.json
-basalt import wmn path/to/wmn/wmn-data.json
+# Verbose mode (show module health details)
+basalt scan -u kyle -v
 ```
 
 ### Flags
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `-o, --output` | `json` | Output format: `json` or `table` |
-| `-c, --concurrency` | `20` | Maximum concurrent requests |
-| `-t, --timeout` | `15` | HTTP request timeout (seconds) |
-| `-v, --verbose` | `false` | Debug logging to stderr |
-| `--threshold` | `0.50` | Minimum confidence score to report a match |
-| `--max-pivot-depth` | `0` | Auto-pivot depth (0 = disabled) |
-| `--no-pivot` | `false` | Disable pivoting entirely |
-| `--proxy` | | Proxy URL or path to proxy list file |
-| `--site-dirs` | | Additional YAML site definition directories |
-| `--rate-limit` | `10` | Global requests per second |
+| `-u, --username` | | Username seed (repeatable) |
+| `-e, --email` | | Email seed (repeatable) |
+| `-d, --domain` | | Domain seed (repeatable) |
+| `--depth` | `2` | Maximum pivot depth |
+| `--concurrency` | `5` | Maximum concurrent module requests |
+| `--timeout` | `10` | Per-module timeout in seconds |
+| `--config` | `~/.basalt/config` | Path to config file for API keys |
+| `--export` | | Export format: `json`, `csv` (repeatable) |
+| `-v, --verbose` | `false` | Show module health details |
 
 ### Output
 
-**JSON** (default) produces a graph with nodes (seeds, accounts) and edges (relationships). Pipe to `jq` or feed into a visualization tool.
+Terminal output is a color-coded table sorted by confidence score (green >= 0.80, yellow >= 0.50).
 
-**Table** prints a color-coded terminal table sorted by confidence score.
+`--export json` writes the full graph (nodes, edges, metadata) to a timestamped JSON file.
+
+`--export csv` writes a flat node list to a timestamped CSV file.
+
+## Modules
+
+18 modules across 5 categories:
+
+| Category | Modules | Seed Types |
+|----------|---------|------------|
+| Identity | Gravatar | email |
+| Dev/Tech | GitHub, GitLab, StackExchange | username, email |
+| Social | Reddit, YouTube, Twitch, Discord, Instagram, TikTok | username |
+| Link-in-Bio | Linktree, Beacons, Carrd, Bento | username |
+| Comms | Matrix | username |
+| Gaming | Steam (API key) | username |
+| Domain | WHOIS/RDAP, DNS/CT | domain |
+
+Modules self-report health before scanning:
+- **Healthy**: normal operation
+- **Degraded**: works but confidence is halved (rate limits, intermittent issues)
+- **Offline**: skipped entirely (API down, missing key)
 
 ## How It Works
 
-Basalt has two engines:
+Basalt uses a **reactive graph walker**. There are no tiers or waves. Execution order emerges from data flow:
 
-**Username engine** checks ~1900 sites using YAML-defined rules. Each check makes two HTTP requests (target + control) and scores confidence across 5 signals: HTTP status, presence strings, absence strings, content differentiation (Jaccard similarity), and redirect detection.
+1. Seed nodes are added to the graph
+2. All modules that can handle each seed type are dispatched concurrently
+3. When a module returns new nodes (emails, usernames, domains), those are fed back into the walker
+4. This continues until pivot depth is reached or no new pivotable nodes are found
 
-**Email engine** runs 16 Go modules that each implement site-specific verification logic (registration probes, login checks, password recovery flows, CSRF-protected forms). These can't be expressed as YAML because they require multi-step flows and custom response parsing.
+Each module independently decides what to extract and what confidence to assign. The walker handles deduplication, concurrency limiting, and depth tracking.
 
-When pivoting is enabled, discovered emails and usernames from one engine feed into the other automatically.
+## Configuration
 
-## Site Definitions
+API keys go in `~/.basalt/config` (or pass `--config path`):
 
-Sites load from these directories (first match wins, duplicates skipped):
+```
+GITHUB_TOKEN=ghp_xxxxxxxxxxxx
+STEAM_API_KEY=XXXXXXXXXXXXXXXX
+```
 
-1. `data/sites/` relative to the binary
-2. `data/sites/` relative to cwd
-3. `~/.basalt/sites/`
-4. Any `--site-dirs` you pass
-
-Each YAML file contains site definitions with URL templates, expected responses, and optional extraction rules. See `data/sites/example.yaml` for the format.
+Modules that need keys will go offline if the key is missing. GitHub works without a token but has lower rate limits.
 
 ## Legal
 
-This tool queries only publicly accessible URLs. No authentication bypass, no private data access, no API abuse.
+This tool queries only publicly accessible endpoints. No authentication bypass, no private data access.
 
-- GDPR: Only scan identifiers you own or have the data subject's explicit consent to search
+- GDPR: only scan identifiers you own or have explicit consent to search
 - Rate limiting is built in and enforced per-domain
 - Proxy support is for privacy, not evasion
 
