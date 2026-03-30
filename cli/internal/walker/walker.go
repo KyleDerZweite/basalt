@@ -176,7 +176,16 @@ func (w *Walker) dispatch(ctx context.Context, node *graph.Node) {
 
 			w.graph.IncrModulesRun()
 
-			nodes, edges, err := mod.Extract(modCtx, node, w.client)
+			// Resolve seed type so modules see "username"/"email" etc.
+			// instead of "seed" in node.Type.
+			extractNode := node
+			if node.Type == graph.NodeTypeSeed {
+				copy := *node
+				copy.Type = lt
+				extractNode = &copy
+			}
+
+			nodes, edges, err := mod.Extract(modCtx, extractNode, w.client)
 			if err != nil {
 				slog.Debug("module error", "module", mod.Name(), "node", node.ID, "err", err)
 				w.graph.IncrErrors()
