@@ -11,13 +11,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Async Walker orchestrator with semaphore-bounded concurrency
 - Module health checks (Healthy / Degraded / Offline) with degraded confidence penalty
 - Automatic pivoting: discovered emails/usernames trigger further module runs
-- 18 purpose-built modules:
-  - **Identity**: Gravatar (email), GitHub (username/email/domain), GitLab (username), Stack Exchange (username)
-  - **Social**: Reddit, YouTube, Twitch, Discord, Instagram, TikTok
+- 29 purpose-built modules:
+  - **Identity**: Gravatar (email), Keybase (username)
+  - **Dev/Tech**: GitHub (username/email/domain), GitLab (username), Stack Exchange (username), Docker Hub (username), DEV.to (username), Hacker News (username)
+  - **Social**: Reddit, YouTube, Twitch, Discord, Instagram, TikTok, Medium, Telegram
   - **Link-in-bio**: Linktree, Beacons, Carrd, Bento
   - **Communication**: Matrix (username)
-  - **Gaming**: Steam (username)
-  - **Infrastructure**: WHOIS/RDAP (domain), DNS/CT via crt.sh (domain)
+  - **Gaming**: Steam (username), OP.GG (username), Spotify (username)
+  - **Infrastructure**: WHOIS/RDAP (domain), DNS/CT via crt.sh (domain), Shodan InternetDB (domain), Wayback Machine (domain), IPinfo (domain)
 - Per-module confidence scoring
 - Three output formats: color-coded table, JSON graph, CSV
 - Config file support (`~/.basalt/config`) for API keys
@@ -27,10 +28,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - False positive mitigation via OG metadata validation (Twitch, Instagram, TikTok)
 - Redirect detection for profile existence (Bento)
 - RDAP-compliant User-Agent to avoid rdap.org blocking
+- Keybase identity proof extraction with cross-platform pivoting
+- DEV.to linked GitHub/Twitter username extraction as pivotable nodes
+- Shodan InternetDB integration for port/CVE/CPE discovery (no auth)
+- Wayback Machine snapshot availability checking
+- IPinfo geolocation and organization lookup for domains
+- OP.GG search endpoint with automatic Riot ID tag resolution across 10 regions
+- Steam public profile scraping (no API key required)
+- Medium, Telegram, Spotify profile detection via OG metadata
 
 ### Changed
 - Complete rewrite from v0.1 site-template engine to per-module architecture
 - HTTP client sends module-specific headers where needed
+- Steam module rewritten from API-key-based to public profile scraping
 
 ## [0.1.0] - 2025-12-01
 

@@ -1,6 +1,6 @@
 # Basalt
 
-Relational OSINT tool for discovering your digital footprint. Basalt runs 18 purpose-built modules against usernames, emails, and domains, then builds a relationship graph of everything it finds.
+Relational OSINT tool for discovering your digital footprint. Basalt runs 29 purpose-built modules against usernames, emails, and domains, then builds a relationship graph of everything it finds.
 
 Unlike tools that spray thousands of sites with URL templates, Basalt uses per-module logic with structured API calls, HTML scraping, and module-level health checks. Each module scores its own confidence. No false positives from generic status code matching.
 
@@ -65,17 +65,18 @@ Terminal output is a color-coded table sorted by confidence score (green >= 0.80
 
 ## Modules
 
-18 modules across 5 categories:
+29 modules across 8 categories:
 
 | Category | Modules | Seed Types |
 |----------|---------|------------|
-| Identity | Gravatar | email |
-| Dev/Tech | GitHub, GitLab, StackExchange | username, email |
-| Social | Reddit, YouTube, Twitch, Discord, Instagram, TikTok | username |
+| Identity | Gravatar, Keybase | email, username |
+| Dev/Tech | GitHub, GitLab, StackExchange, Docker Hub, DEV.to, Hacker News | username, email |
+| Social | Reddit, YouTube, Twitch, Discord, Instagram, TikTok, Medium, Telegram | username |
 | Link-in-Bio | Linktree, Beacons, Carrd, Bento | username |
 | Comms | Matrix | username |
-| Gaming | Steam (API key) | username |
+| Gaming | Steam, OP.GG, Spotify | username |
 | Domain | WHOIS/RDAP, DNS/CT | domain |
+| Infrastructure | Shodan, Wayback Machine, IPinfo | domain |
 
 Modules self-report health before scanning:
 - **Healthy**: normal operation
@@ -99,10 +100,9 @@ API keys go in `~/.basalt/config` (or pass `--config path`):
 
 ```
 GITHUB_TOKEN=ghp_xxxxxxxxxxxx
-STEAM_API_KEY=XXXXXXXXXXXXXXXX
 ```
 
-Modules that need keys will go offline if the key is missing. GitHub works without a token but has lower rate limits.
+GitHub works without a token but has lower rate limits. All other modules work without API keys.
 
 ## Legal
 
