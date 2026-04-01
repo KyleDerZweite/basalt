@@ -33,10 +33,14 @@ import (
 	"github.com/kyle/basalt/internal/modules/keybase"
 	"github.com/kyle/basalt/internal/modules/linktree"
 	"github.com/kyle/basalt/internal/modules/matrix"
+	"github.com/kyle/basalt/internal/modules/medium"
+	"github.com/kyle/basalt/internal/modules/opgg"
 	"github.com/kyle/basalt/internal/modules/reddit"
 	"github.com/kyle/basalt/internal/modules/shodan"
+	"github.com/kyle/basalt/internal/modules/spotify"
 	"github.com/kyle/basalt/internal/modules/stackexchange"
 	"github.com/kyle/basalt/internal/modules/steam"
+	"github.com/kyle/basalt/internal/modules/telegram"
 	"github.com/kyle/basalt/internal/modules/tiktok"
 	"github.com/kyle/basalt/internal/modules/twitch"
 	"github.com/kyle/basalt/internal/modules/wayback"
@@ -135,7 +139,11 @@ func runScan(cmd *cobra.Command, args []string) error {
 	reg.Register(instagram.New())
 	reg.Register(tiktok.New())
 	reg.Register(matrix.New())
-	reg.Register(steam.New(cfg.Get("STEAM_API_KEY")))
+	reg.Register(steam.New())
+	reg.Register(spotify.New())
+	reg.Register(telegram.New())
+	reg.Register(medium.New())
+	reg.Register(opgg.New())
 	reg.Register(keybase.New())
 	reg.Register(hackernews.New())
 	reg.Register(dockerhub.New())
