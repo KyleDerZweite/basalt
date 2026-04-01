@@ -20,19 +20,26 @@ import (
 	"github.com/kyle/basalt/internal/modules/beacons"
 	"github.com/kyle/basalt/internal/modules/bento"
 	"github.com/kyle/basalt/internal/modules/carrd"
+	"github.com/kyle/basalt/internal/modules/devto"
 	"github.com/kyle/basalt/internal/modules/discord"
 	"github.com/kyle/basalt/internal/modules/dnsct"
+	"github.com/kyle/basalt/internal/modules/dockerhub"
 	"github.com/kyle/basalt/internal/modules/github"
 	"github.com/kyle/basalt/internal/modules/gitlab"
 	"github.com/kyle/basalt/internal/modules/gravatar"
+	"github.com/kyle/basalt/internal/modules/hackernews"
 	"github.com/kyle/basalt/internal/modules/instagram"
+	"github.com/kyle/basalt/internal/modules/ipinfo"
+	"github.com/kyle/basalt/internal/modules/keybase"
 	"github.com/kyle/basalt/internal/modules/linktree"
 	"github.com/kyle/basalt/internal/modules/matrix"
 	"github.com/kyle/basalt/internal/modules/reddit"
+	"github.com/kyle/basalt/internal/modules/shodan"
 	"github.com/kyle/basalt/internal/modules/stackexchange"
 	"github.com/kyle/basalt/internal/modules/steam"
 	"github.com/kyle/basalt/internal/modules/tiktok"
 	"github.com/kyle/basalt/internal/modules/twitch"
+	"github.com/kyle/basalt/internal/modules/wayback"
 	"github.com/kyle/basalt/internal/modules/whois"
 	"github.com/kyle/basalt/internal/modules/youtube"
 	"github.com/kyle/basalt/internal/output"
@@ -129,8 +136,15 @@ func runScan(cmd *cobra.Command, args []string) error {
 	reg.Register(tiktok.New())
 	reg.Register(matrix.New())
 	reg.Register(steam.New(cfg.Get("STEAM_API_KEY")))
+	reg.Register(keybase.New())
+	reg.Register(hackernews.New())
+	reg.Register(dockerhub.New())
+	reg.Register(devto.New())
 	reg.Register(whois.New())
 	reg.Register(dnsct.New())
+	reg.Register(shodan.New())
+	reg.Register(wayback.New())
+	reg.Register(ipinfo.New())
 
 	// Build graph.
 	g := graph.New()
