@@ -5,6 +5,7 @@ package opgg
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -35,9 +36,9 @@ func (m *Module) CanHandle(nodeType string) bool { return nodeType == "username"
 func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclient.Client) ([]*graph.Node, []*graph.Edge, error) {
 	username := node.Label
 
-	// OP.GG URL format: /lol/summoners/{region}/{name}-{tag}
-	// Try the username as both the name and the tag (common pattern).
-	// Also try without tag for exact vanity URLs.
+	// OP.GG search endpoint resolves Riot ID tags automatically.
+	// /summoners/search?q={name}&region={region} returns the profile
+	// page with og:title containing the full Riot ID if found.
 	for _, region := range regions {
 		select {
 		case <-ctx.Done():
@@ -45,12 +46,9 @@ func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclie
 		default:
 		}
 
-		url := fmt.Sprintf("%s/lol/summoners/%s/%s-%s", m.baseURL, region, username, strings.ToUpper(region))
-		resp, err := client.Do(ctx, url, nil)
+		searchURL := fmt.Sprintf("%s/summoners/search?q=%s&region=%s", m.baseURL, url.QueryEscape(username), region)
+		resp, err := client.Do(ctx, searchURL, nil)
 		if err != nil {
-			continue
-		}
-		if resp.StatusCode == 404 {
 			continue
 		}
 		if resp.StatusCode != 200 {
@@ -73,14 +71,20 @@ func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclie
 			continue
 		}
 
+		// Get the canonical profile URL from og:url.
+		profileURL := searchURL
+		if ogURL, exists := doc.Find(`meta[property="og:url"]`).Attr("content"); exists && ogURL != "" {
+			profileURL = ogURL
+		}
+
 		var nodes []*graph.Node
 		var edges []*graph.Edge
 
-		account := graph.NewAccountNode("opgg", username, url, "opgg")
+		account := graph.NewAccountNode("opgg", username, profileURL, "opgg")
 		account.Confidence = 0.90
 		account.Properties["region"] = region
 
-		// Extract summoner name from title.
+		// Extract summoner name (includes tag) from title.
 		summonerName := strings.Split(title, " - Summoner Stats")[0]
 		if summonerName != "" {
 			account.Properties["summoner_name"] = summonerName
@@ -104,9 +108,9 @@ func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclie
 }
 
 func (m *Module) Verify(ctx context.Context, client *httpclient.Client) (modules.HealthStatus, string) {
-	// Check that OP.GG is reachable by looking up Faker (famous LoL player).
-	url := fmt.Sprintf("%s/lol/summoners/kr/Hide%%20on%%20bush-KR1", m.baseURL)
-	resp, err := client.Do(ctx, url, nil)
+	// Use the search endpoint to look up a known player.
+	searchURL := fmt.Sprintf("%s/summoners/search?q=Faker&region=kr", m.baseURL)
+	resp, err := client.Do(ctx, searchURL, nil)
 	if err != nil {
 		return modules.Offline, fmt.Sprintf("opgg: %v", err)
 	}
