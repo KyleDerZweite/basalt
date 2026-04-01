@@ -95,7 +95,7 @@ func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclie
 }
 
 func (m *Module) Verify(ctx context.Context, client *httpclient.Client) (modules.HealthStatus, string) {
-	apiURL := fmt.Sprintf("%s/v2/users/library", m.baseURL)
+	apiURL := fmt.Sprintf("%s/v2/users/thajeztah", m.baseURL)
 	resp, err := client.Do(ctx, apiURL, nil)
 	if err != nil {
 		return modules.Offline, fmt.Sprintf("dockerhub: %v", err)
@@ -103,8 +103,9 @@ func (m *Module) Verify(ctx context.Context, client *httpclient.Client) (modules
 	if resp.StatusCode == 200 {
 		var user struct {
 			Username string `json:"username"`
+			Orgname  string `json:"orgname"`
 		}
-		if err := json.Unmarshal([]byte(resp.Body), &user); err == nil && user.Username != "" {
+		if err := json.Unmarshal([]byte(resp.Body), &user); err == nil && (user.Username != "" || user.Orgname != "") {
 			return modules.Healthy, "dockerhub: OK"
 		}
 		return modules.Degraded, "dockerhub: unexpected response format"
