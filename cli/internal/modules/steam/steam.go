@@ -101,7 +101,7 @@ func (m *Module) Verify(ctx context.Context, client *httpclient.Client) (modules
 	}
 
 	title, _ := doc.Find(`meta[property="og:title"]`).Attr("content")
-	if strings.Contains(title, ":: Valve") {
+	if strings.Contains(title, "Steam Community ::") && !strings.Contains(title, ":: Error") {
 		return modules.Healthy, "steam: OK"
 	}
 	return modules.Degraded, "steam: unexpected response"

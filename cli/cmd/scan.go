@@ -20,6 +20,7 @@ import (
 	"github.com/kyle/basalt/internal/modules/beacons"
 	"github.com/kyle/basalt/internal/modules/bento"
 	"github.com/kyle/basalt/internal/modules/carrd"
+	"github.com/kyle/basalt/internal/modules/chesscom"
 	"github.com/kyle/basalt/internal/modules/devto"
 	"github.com/kyle/basalt/internal/modules/discord"
 	"github.com/kyle/basalt/internal/modules/dnsct"
@@ -34,15 +35,19 @@ import (
 	"github.com/kyle/basalt/internal/modules/linktree"
 	"github.com/kyle/basalt/internal/modules/matrix"
 	"github.com/kyle/basalt/internal/modules/medium"
+	"github.com/kyle/basalt/internal/modules/myanimelist"
 	"github.com/kyle/basalt/internal/modules/opgg"
 	"github.com/kyle/basalt/internal/modules/reddit"
+	"github.com/kyle/basalt/internal/modules/roblox"
 	"github.com/kyle/basalt/internal/modules/shodan"
 	"github.com/kyle/basalt/internal/modules/spotify"
 	"github.com/kyle/basalt/internal/modules/stackexchange"
 	"github.com/kyle/basalt/internal/modules/steam"
 	"github.com/kyle/basalt/internal/modules/telegram"
 	"github.com/kyle/basalt/internal/modules/tiktok"
+	"github.com/kyle/basalt/internal/modules/trello"
 	"github.com/kyle/basalt/internal/modules/twitch"
+	"github.com/kyle/basalt/internal/modules/wattpad"
 	"github.com/kyle/basalt/internal/modules/wayback"
 	"github.com/kyle/basalt/internal/modules/whois"
 	"github.com/kyle/basalt/internal/modules/youtube"
@@ -133,6 +138,7 @@ func runScan(cmd *cobra.Command, args []string) error {
 	reg.Register(gitlab.New())
 	reg.Register(stackexchange.New())
 	reg.Register(reddit.New())
+	reg.Register(roblox.New())
 	reg.Register(youtube.New())
 	reg.Register(twitch.New())
 	reg.Register(discord.New())
@@ -143,11 +149,15 @@ func runScan(cmd *cobra.Command, args []string) error {
 	reg.Register(spotify.New())
 	reg.Register(telegram.New())
 	reg.Register(medium.New())
+	reg.Register(myanimelist.New())
 	reg.Register(opgg.New())
 	reg.Register(keybase.New())
 	reg.Register(hackernews.New())
 	reg.Register(dockerhub.New())
 	reg.Register(devto.New())
+	reg.Register(chesscom.New())
+	reg.Register(trello.New())
+	reg.Register(wattpad.New())
 	reg.Register(whois.New())
 	reg.Register(dnsct.New())
 	reg.Register(shodan.New())
