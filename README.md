@@ -9,13 +9,14 @@ Unlike tools that spray thousands of sites with URL templates, Basalt uses per-m
 ## Install
 
 ```bash
-go install github.com/kyle/basalt@latest
+go install github.com/kylederzweite/basalt@latest
 ```
 
 Or build from source:
 
 ```bash
-cd cli
+git clone https://github.com/KyleDerZweite/basalt.git
+cd basalt && cd cli
 go build -o basalt .
 ```
 

@@ -83,6 +83,7 @@ func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclie
 	// Create FullName node if present and non-empty
 	if profile.FullName != "" {
 		fullNameNode := graph.NewNode(graph.NodeTypeFullName, profile.FullName, "trello")
+		fullNameNode.Confidence = 0.85
 		nodes = append(nodes, fullNameNode)
 		edges = append(edges, graph.NewEdge(0, account.ID, fullNameNode.ID, graph.EdgeTypeLinkedTo, "trello"))
 	}
