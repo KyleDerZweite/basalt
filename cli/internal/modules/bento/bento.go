@@ -9,9 +9,9 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const bentoURL = "https://bento.me/"
@@ -23,8 +23,10 @@ type Module struct {
 
 func New() *Module { return &Module{baseURL: bentoURL} }
 
-func (m *Module) Name() string                  { return "bento" }
-func (m *Module) Description() string            { return "Scrape Bento.me profiles for linked accounts and websites" }
+func (m *Module) Name() string { return "bento" }
+func (m *Module) Description() string {
+	return "Scrape Bento.me profiles for linked accounts and websites"
+}
 func (m *Module) CanHandle(nodeType string) bool { return nodeType == "username" }
 
 func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclient.Client) ([]*graph.Node, []*graph.Edge, error) {

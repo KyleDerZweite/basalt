@@ -10,9 +10,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 func TestCanHandle(t *testing.T) {
@@ -117,9 +117,9 @@ func TestVerifyHealthy(t *testing.T) {
 	}
 }
 
-func TestVerifyDegraded(t *testing.T) {
+func TestVerifyOfflineWhenRemoved(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusForbidden)
+		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer srv.Close()
 
@@ -128,7 +128,7 @@ func TestVerifyDegraded(t *testing.T) {
 
 	client := httpclient.New()
 	status, _ := m.Verify(context.Background(), client)
-	if status != modules.Degraded {
-		t.Errorf("expected Degraded, got %d", status)
+	if status != modules.Offline {
+		t.Errorf("expected Offline, got %d", status)
 	}
 }

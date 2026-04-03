@@ -8,9 +8,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const sampleHTML = `<!DOCTYPE html>
@@ -93,5 +93,21 @@ func TestVerifyHealthy(t *testing.T) {
 	status, _ := m.Verify(context.Background(), client)
 	if status != modules.Healthy {
 		t.Errorf("expected Healthy, got %d", status)
+	}
+}
+
+func TestVerifyOfflineOnBlock(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer srv.Close()
+
+	m := New()
+	m.baseURL = srv.URL + "/"
+
+	client := httpclient.New()
+	status, _ := m.Verify(context.Background(), client)
+	if status != modules.Offline {
+		t.Errorf("expected Offline, got %d", status)
 	}
 }

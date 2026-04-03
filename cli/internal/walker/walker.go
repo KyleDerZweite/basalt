@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 // ModuleHealth tracks the verified state of a module.

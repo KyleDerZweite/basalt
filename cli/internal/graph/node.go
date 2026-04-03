@@ -11,7 +11,7 @@ import (
 const (
 	NodeTypeSeed         = "seed"
 	NodeTypeAccount      = "account"
-	NodeTypeUsername      = "username"
+	NodeTypeUsername     = "username"
 	NodeTypeEmail        = "email"
 	NodeTypeDomain       = "domain"
 	NodeTypeIP           = "ip"

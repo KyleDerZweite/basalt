@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-03-29-basalt-v2-design.md`
 
-**Module path:** `github.com/kyle/basalt` (working directory: `cli/`)
+**Module path:** `github.com/KyleDerZweite/basalt` (working directory: `cli/`)
 
 ---
 
@@ -747,8 +747,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
 )
 
 // stubModule is a minimal Module implementation for testing.
@@ -842,8 +842,8 @@ package modules
 import (
 	"context"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
 )
 
 // HealthStatus represents the operational state of a module.
@@ -974,9 +974,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 // fakeModule returns predictable results for testing.
@@ -1246,9 +1246,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 // ModuleHealth tracks the verified state of a module.
@@ -1700,9 +1700,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 func TestCanHandle(t *testing.T) {
@@ -1835,9 +1835,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const gravatarAPI = "https://en.gravatar.com"
@@ -2009,9 +2009,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 func TestCanHandle(t *testing.T) {
@@ -2190,9 +2190,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const githubAPI = "https://api.github.com"
@@ -2456,9 +2456,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const sampleHTML = `<!DOCTYPE html>
@@ -2562,9 +2562,9 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const linktreeURL = "https://linktr.ee/"
@@ -2869,9 +2869,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 func TestCanHandle(t *testing.T) {
@@ -2986,9 +2986,9 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const steamAPI = "https://api.steampowered.com"
@@ -3209,7 +3209,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kyle/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/graph"
 )
 
 func testGraph() *graph.Graph {
@@ -3369,7 +3369,7 @@ import (
 
 	"github.com/fatih/color"
 
-	"github.com/kyle/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/graph"
 )
 
 var (
@@ -3465,7 +3465,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/kyle/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/graph"
 )
 
 // WriteJSON writes the full graph as indented JSON.
@@ -3504,7 +3504,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/kyle/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/graph"
 )
 
 // WriteCSV writes a flat CSV of all nodes (one row per node).
@@ -3582,30 +3582,30 @@ import (
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 
-	"github.com/kyle/basalt/internal/config"
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
-	"github.com/kyle/basalt/internal/modules/beacons"
-	"github.com/kyle/basalt/internal/modules/bento"
-	"github.com/kyle/basalt/internal/modules/carrd"
-	"github.com/kyle/basalt/internal/modules/discord"
-	"github.com/kyle/basalt/internal/modules/dnsct"
-	"github.com/kyle/basalt/internal/modules/github"
-	"github.com/kyle/basalt/internal/modules/gitlab"
-	"github.com/kyle/basalt/internal/modules/gravatar"
-	"github.com/kyle/basalt/internal/modules/instagram"
-	"github.com/kyle/basalt/internal/modules/linktree"
-	"github.com/kyle/basalt/internal/modules/matrix"
-	"github.com/kyle/basalt/internal/modules/reddit"
-	"github.com/kyle/basalt/internal/modules/stackexchange"
-	"github.com/kyle/basalt/internal/modules/steam"
-	"github.com/kyle/basalt/internal/modules/tiktok"
-	"github.com/kyle/basalt/internal/modules/twitch"
-	"github.com/kyle/basalt/internal/modules/whois"
-	"github.com/kyle/basalt/internal/modules/youtube"
-	"github.com/kyle/basalt/internal/output"
-	"github.com/kyle/basalt/internal/walker"
+	"github.com/KyleDerZweite/basalt/internal/config"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/modules/beacons"
+	"github.com/KyleDerZweite/basalt/internal/modules/bento"
+	"github.com/KyleDerZweite/basalt/internal/modules/carrd"
+	"github.com/KyleDerZweite/basalt/internal/modules/discord"
+	"github.com/KyleDerZweite/basalt/internal/modules/dnsct"
+	"github.com/KyleDerZweite/basalt/internal/modules/github"
+	"github.com/KyleDerZweite/basalt/internal/modules/gitlab"
+	"github.com/KyleDerZweite/basalt/internal/modules/gravatar"
+	"github.com/KyleDerZweite/basalt/internal/modules/instagram"
+	"github.com/KyleDerZweite/basalt/internal/modules/linktree"
+	"github.com/KyleDerZweite/basalt/internal/modules/matrix"
+	"github.com/KyleDerZweite/basalt/internal/modules/reddit"
+	"github.com/KyleDerZweite/basalt/internal/modules/stackexchange"
+	"github.com/KyleDerZweite/basalt/internal/modules/steam"
+	"github.com/KyleDerZweite/basalt/internal/modules/tiktok"
+	"github.com/KyleDerZweite/basalt/internal/modules/twitch"
+	"github.com/KyleDerZweite/basalt/internal/modules/whois"
+	"github.com/KyleDerZweite/basalt/internal/modules/youtube"
+	"github.com/KyleDerZweite/basalt/internal/output"
+	"github.com/KyleDerZweite/basalt/internal/walker"
 )
 
 var (

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/kyle/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/graph"
 )
 
 // WriteCSV writes a flat CSV of all nodes (one row per node).

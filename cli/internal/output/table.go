@@ -10,7 +10,7 @@ import (
 
 	"github.com/fatih/color"
 
-	"github.com/kyle/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/graph"
 )
 
 var (

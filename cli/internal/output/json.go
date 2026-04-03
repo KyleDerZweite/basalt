@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/kyle/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/graph"
 )
 
 // WriteJSON writes the full graph as indented JSON.

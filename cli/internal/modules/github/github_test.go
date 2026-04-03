@@ -9,9 +9,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 func TestCanHandle(t *testing.T) {
@@ -29,16 +29,16 @@ func TestCanHandle(t *testing.T) {
 
 func TestExtractUsername(t *testing.T) {
 	user := map[string]interface{}{
-		"login":              "kylederzweite",
-		"name":               "Kyle",
-		"email":              "kyle@kylehub.dev",
-		"blog":               "https://kylehub.dev",
-		"company":            "ACME",
-		"location":           "Germany",
-		"bio":                "Developer",
-		"html_url":           "https://github.com/kylederzweite",
-		"avatar_url":         "https://avatars.githubusercontent.com/u/123",
-		"twitter_username":   "kyletweets",
+		"login":            "kylederzweite",
+		"name":             "Kyle",
+		"email":            "kyle@kylehub.dev",
+		"blog":             "https://kylehub.dev",
+		"company":          "ACME",
+		"location":         "Germany",
+		"bio":              "Developer",
+		"html_url":         "https://github.com/kylederzweite",
+		"avatar_url":       "https://avatars.githubusercontent.com/u/123",
+		"twitter_username": "kyletweets",
 	}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

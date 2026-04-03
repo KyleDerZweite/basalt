@@ -7,9 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const redditURL = "https://www.reddit.com"
@@ -24,8 +24,8 @@ func New() *Module {
 	return &Module{baseURL: redditURL}
 }
 
-func (m *Module) Name() string                  { return "reddit" }
-func (m *Module) Description() string           { return "Extract profile data from Reddit user pages" }
+func (m *Module) Name() string                   { return "reddit" }
+func (m *Module) Description() string            { return "Extract profile data from Reddit user pages" }
 func (m *Module) CanHandle(nodeType string) bool { return nodeType == "username" }
 
 func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclient.Client) ([]*graph.Node, []*graph.Edge, error) {

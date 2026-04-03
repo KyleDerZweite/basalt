@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const matrixAPI = "https://matrix.org"
@@ -25,7 +25,7 @@ func New() *Module {
 	return &Module{baseURL: matrixAPI}
 }
 
-func (m *Module) Name() string                  { return "matrix" }
+func (m *Module) Name() string                   { return "matrix" }
 func (m *Module) Description() string            { return "Extract profile data from Matrix" }
 func (m *Module) CanHandle(nodeType string) bool { return nodeType == "username" }
 

@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const wattpadBaseURL = "https://www.wattpad.com"
@@ -49,21 +49,21 @@ func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclie
 	}
 
 	var user struct {
-		Username             string `json:"username"`
-		Name                 string `json:"name"`
-		Avatar               string `json:"avatar"`
-		Description          string `json:"description"`
-		Location             string `json:"location"`
-		Gender               string `json:"gender"`
-		GenderCode           string `json:"genderCode"`
-		CreateDate           int64  `json:"createDate"`
-		Verified             bool   `json:"verified"`
-		Website              string `json:"website"`
-		Facebook             string `json:"facebook"`
-		NumFollowers         int    `json:"numFollowers"`
-		NumFollowing         int    `json:"numFollowing"`
-		NumStoriesPublished  int    `json:"numStoriesPublished"`
-		VotesReceived        int    `json:"votesReceived"`
+		Username            string `json:"username"`
+		Name                string `json:"name"`
+		Avatar              string `json:"avatar"`
+		Description         string `json:"description"`
+		Location            string `json:"location"`
+		Gender              string `json:"gender"`
+		GenderCode          string `json:"genderCode"`
+		CreateDate          int64  `json:"createDate"`
+		Verified            bool   `json:"verified"`
+		Website             string `json:"website"`
+		Facebook            string `json:"facebook"`
+		NumFollowers        int    `json:"numFollowers"`
+		NumFollowing        int    `json:"numFollowing"`
+		NumStoriesPublished int    `json:"numStoriesPublished"`
+		VotesReceived       int    `json:"votesReceived"`
 	}
 	if err := json.Unmarshal([]byte(resp.Body), &user); err != nil {
 		return nil, nil, fmt.Errorf("parsing wattpad response: %w", err)

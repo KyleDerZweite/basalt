@@ -9,9 +9,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const defaultBaseURL = "https://archive.org"
@@ -93,19 +93,14 @@ func (m *Module) Verify(ctx context.Context, client *httpclient.Client) (modules
 	}
 
 	var payload struct {
-		ArchivedSnapshots struct {
-			Closest *struct {
-				Available bool `json:"available"`
-			} `json:"closest"`
-		} `json:"archived_snapshots"`
+		URL               string          `json:"url"`
+		ArchivedSnapshots json.RawMessage `json:"archived_snapshots"`
 	}
 	if err := json.Unmarshal([]byte(resp.Body), &payload); err != nil {
 		return modules.Degraded, fmt.Sprintf("wayback: invalid JSON: %v", err)
 	}
-
-	if payload.ArchivedSnapshots.Closest == nil || !payload.ArchivedSnapshots.Closest.Available {
-		return modules.Degraded, "wayback: example.com not archived (unexpected)"
+	if payload.URL == "" || payload.ArchivedSnapshots == nil {
+		return modules.Degraded, "wayback: unexpected response format"
 	}
-
 	return modules.Healthy, "wayback: OK"
 }

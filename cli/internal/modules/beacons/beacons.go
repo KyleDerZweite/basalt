@@ -9,9 +9,9 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const beaconsURL = "https://beacons.ai/"
@@ -23,8 +23,10 @@ type Module struct {
 
 func New() *Module { return &Module{baseURL: beaconsURL} }
 
-func (m *Module) Name() string                  { return "beacons" }
-func (m *Module) Description() string            { return "Scrape Beacons.ai profiles for linked accounts and websites" }
+func (m *Module) Name() string { return "beacons" }
+func (m *Module) Description() string {
+	return "Scrape Beacons.ai profiles for linked accounts and websites"
+}
 func (m *Module) CanHandle(nodeType string) bool { return nodeType == "username" }
 
 func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclient.Client) ([]*graph.Node, []*graph.Edge, error) {
@@ -86,7 +88,7 @@ func (m *Module) Verify(ctx context.Context, client *httpclient.Client) (modules
 		return modules.Healthy, "beacons: OK"
 	}
 	if resp.StatusCode == 403 || resp.StatusCode == 429 {
-		return modules.Degraded, fmt.Sprintf("beacons: %d (may be rate limited)", resp.StatusCode)
+		return modules.Offline, fmt.Sprintf("beacons: blocked by Cloudflare or rate limit (%d)", resp.StatusCode)
 	}
 	return modules.Offline, fmt.Sprintf("beacons: status %d", resp.StatusCode)
 }

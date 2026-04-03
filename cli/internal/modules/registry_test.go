@@ -6,8 +6,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
 )
 
 // stubModule is a minimal Module implementation for testing.

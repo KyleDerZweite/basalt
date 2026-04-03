@@ -13,46 +13,49 @@ import (
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 
-	"github.com/kyle/basalt/internal/config"
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
-	"github.com/kyle/basalt/internal/modules/beacons"
-	"github.com/kyle/basalt/internal/modules/bento"
-	"github.com/kyle/basalt/internal/modules/carrd"
-	"github.com/kyle/basalt/internal/modules/chesscom"
-	"github.com/kyle/basalt/internal/modules/devto"
-	"github.com/kyle/basalt/internal/modules/discord"
-	"github.com/kyle/basalt/internal/modules/dnsct"
-	"github.com/kyle/basalt/internal/modules/dockerhub"
-	"github.com/kyle/basalt/internal/modules/github"
-	"github.com/kyle/basalt/internal/modules/gitlab"
-	"github.com/kyle/basalt/internal/modules/gravatar"
-	"github.com/kyle/basalt/internal/modules/hackernews"
-	"github.com/kyle/basalt/internal/modules/instagram"
-	"github.com/kyle/basalt/internal/modules/ipinfo"
-	"github.com/kyle/basalt/internal/modules/keybase"
-	"github.com/kyle/basalt/internal/modules/linktree"
-	"github.com/kyle/basalt/internal/modules/matrix"
-	"github.com/kyle/basalt/internal/modules/medium"
-	"github.com/kyle/basalt/internal/modules/myanimelist"
-	"github.com/kyle/basalt/internal/modules/opgg"
-	"github.com/kyle/basalt/internal/modules/reddit"
-	"github.com/kyle/basalt/internal/modules/roblox"
-	"github.com/kyle/basalt/internal/modules/shodan"
-	"github.com/kyle/basalt/internal/modules/spotify"
-	"github.com/kyle/basalt/internal/modules/stackexchange"
-	"github.com/kyle/basalt/internal/modules/steam"
-	"github.com/kyle/basalt/internal/modules/telegram"
-	"github.com/kyle/basalt/internal/modules/tiktok"
-	"github.com/kyle/basalt/internal/modules/trello"
-	"github.com/kyle/basalt/internal/modules/twitch"
-	"github.com/kyle/basalt/internal/modules/wattpad"
-	"github.com/kyle/basalt/internal/modules/wayback"
-	"github.com/kyle/basalt/internal/modules/whois"
-	"github.com/kyle/basalt/internal/modules/youtube"
-	"github.com/kyle/basalt/internal/output"
-	"github.com/kyle/basalt/internal/walker"
+	"github.com/KyleDerZweite/basalt/internal/config"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/modules/beacons"
+	"github.com/KyleDerZweite/basalt/internal/modules/bento"
+	"github.com/KyleDerZweite/basalt/internal/modules/carrd"
+	"github.com/KyleDerZweite/basalt/internal/modules/chesscom"
+	"github.com/KyleDerZweite/basalt/internal/modules/codeberg"
+	"github.com/KyleDerZweite/basalt/internal/modules/codeforces"
+	"github.com/KyleDerZweite/basalt/internal/modules/devto"
+	"github.com/KyleDerZweite/basalt/internal/modules/discord"
+	"github.com/KyleDerZweite/basalt/internal/modules/dnsct"
+	"github.com/KyleDerZweite/basalt/internal/modules/dockerhub"
+	"github.com/KyleDerZweite/basalt/internal/modules/github"
+	"github.com/KyleDerZweite/basalt/internal/modules/gitlab"
+	"github.com/KyleDerZweite/basalt/internal/modules/gravatar"
+	"github.com/KyleDerZweite/basalt/internal/modules/hackernews"
+	"github.com/KyleDerZweite/basalt/internal/modules/instagram"
+	"github.com/KyleDerZweite/basalt/internal/modules/ipinfo"
+	"github.com/KyleDerZweite/basalt/internal/modules/keybase"
+	"github.com/KyleDerZweite/basalt/internal/modules/lichess"
+	"github.com/KyleDerZweite/basalt/internal/modules/linktree"
+	"github.com/KyleDerZweite/basalt/internal/modules/matrix"
+	"github.com/KyleDerZweite/basalt/internal/modules/medium"
+	"github.com/KyleDerZweite/basalt/internal/modules/myanimelist"
+	"github.com/KyleDerZweite/basalt/internal/modules/opgg"
+	"github.com/KyleDerZweite/basalt/internal/modules/reddit"
+	"github.com/KyleDerZweite/basalt/internal/modules/roblox"
+	"github.com/KyleDerZweite/basalt/internal/modules/shodan"
+	"github.com/KyleDerZweite/basalt/internal/modules/spotify"
+	"github.com/KyleDerZweite/basalt/internal/modules/stackexchange"
+	"github.com/KyleDerZweite/basalt/internal/modules/steam"
+	"github.com/KyleDerZweite/basalt/internal/modules/telegram"
+	"github.com/KyleDerZweite/basalt/internal/modules/tiktok"
+	"github.com/KyleDerZweite/basalt/internal/modules/trello"
+	"github.com/KyleDerZweite/basalt/internal/modules/twitch"
+	"github.com/KyleDerZweite/basalt/internal/modules/wattpad"
+	"github.com/KyleDerZweite/basalt/internal/modules/wayback"
+	"github.com/KyleDerZweite/basalt/internal/modules/whois"
+	"github.com/KyleDerZweite/basalt/internal/modules/youtube"
+	"github.com/KyleDerZweite/basalt/internal/output"
+	"github.com/KyleDerZweite/basalt/internal/walker"
 )
 
 var (
@@ -136,6 +139,8 @@ func runScan(cmd *cobra.Command, args []string) error {
 	reg.Register(bento.New())
 	reg.Register(github.New(cfg.Get("GITHUB_TOKEN")))
 	reg.Register(gitlab.New())
+	reg.Register(codeberg.New())
+	reg.Register(codeforces.New())
 	reg.Register(stackexchange.New())
 	reg.Register(reddit.New())
 	reg.Register(roblox.New())
@@ -156,6 +161,7 @@ func runScan(cmd *cobra.Command, args []string) error {
 	reg.Register(dockerhub.New())
 	reg.Register(devto.New())
 	reg.Register(chesscom.New())
+	reg.Register(lichess.New())
 	reg.Register(trello.New())
 	reg.Register(wattpad.New())
 	reg.Register(whois.New())

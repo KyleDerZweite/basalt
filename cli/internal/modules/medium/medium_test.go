@@ -8,9 +8,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const foundHTML = `<html><head>
@@ -36,9 +36,6 @@ func TestCanHandle(t *testing.T) {
 
 func TestExtractFound(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("User-Agent") != "basalt/2.0" {
-			t.Error("expected User-Agent basalt/2.0")
-		}
 		w.Header().Set("Content-Type", "text/html")
 		w.Write([]byte(foundHTML))
 	}))
@@ -104,5 +101,21 @@ func TestVerifyHealthy(t *testing.T) {
 	status, msg := m.Verify(context.Background(), client)
 	if status != modules.Healthy {
 		t.Errorf("expected Healthy, got %d: %s", status, msg)
+	}
+}
+
+func TestVerifyOfflineOnChallenge(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer srv.Close()
+
+	m := New()
+	m.baseURL = srv.URL
+
+	client := httpclient.New()
+	status, _ := m.Verify(context.Background(), client)
+	if status != modules.Offline {
+		t.Errorf("expected Offline, got %d", status)
 	}
 }

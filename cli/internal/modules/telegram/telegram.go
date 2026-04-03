@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 	"github.com/PuerkitoBio/goquery"
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
 )
 
 const defaultBaseURL = "https://t.me"

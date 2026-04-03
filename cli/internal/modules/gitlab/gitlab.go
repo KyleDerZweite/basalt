@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const gitlabAPI = "https://gitlab.com"
@@ -25,7 +25,7 @@ func New() *Module {
 	return &Module{baseURL: gitlabAPI}
 }
 
-func (m *Module) Name() string                  { return "gitlab" }
+func (m *Module) Name() string                   { return "gitlab" }
 func (m *Module) Description() string            { return "Extract profile data from GitLab" }
 func (m *Module) CanHandle(nodeType string) bool { return nodeType == "username" }
 

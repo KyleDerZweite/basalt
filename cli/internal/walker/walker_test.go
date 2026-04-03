@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 // fakeModule implements modules.Module for testing.
@@ -25,7 +25,7 @@ type fakeModule struct {
 }
 
 func (f *fakeModule) Name() string        { return f.name }
-func (f *fakeModule) Description() string  { return "fake module for testing" }
+func (f *fakeModule) Description() string { return "fake module for testing" }
 
 func (f *fakeModule) CanHandle(nodeType string) bool {
 	for _, h := range f.handles {

@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 	"github.com/PuerkitoBio/goquery"
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
 )
 
 const defaultBaseURL = "https://open.spotify.com"
@@ -33,7 +33,7 @@ func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclie
 	username := node.Label
 	url := fmt.Sprintf("%s/user/%s", m.baseURL, username)
 
-	resp, err := client.Do(ctx, url, nil)
+	resp, err := client.Do(ctx, url, spotifyHeaders())
 	if err != nil {
 		return nil, nil, fmt.Errorf("spotify request: %w", err)
 	}
@@ -50,9 +50,7 @@ func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclie
 	}
 
 	title, hasTitle := doc.Find(`meta[property="og:title"]`).Attr("content")
-	// Require og:type=profile or a meaningful title to confirm the user exists.
-	ogType, _ := doc.Find(`meta[property="og:type"]`).Attr("content")
-	if !hasTitle || ogType != "profile" {
+	if !hasTitle || !isProfilePage(doc) {
 		return nil, nil, nil
 	}
 
@@ -85,7 +83,7 @@ func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclie
 
 func (m *Module) Verify(ctx context.Context, client *httpclient.Client) (modules.HealthStatus, string) {
 	url := fmt.Sprintf("%s/user/spotify", m.baseURL)
-	resp, err := client.Do(ctx, url, nil)
+	resp, err := client.Do(ctx, url, spotifyHeaders())
 	if err != nil {
 		return modules.Offline, fmt.Sprintf("spotify: %v", err)
 	}
@@ -97,8 +95,27 @@ func (m *Module) Verify(ctx context.Context, client *httpclient.Client) (modules
 	if err != nil {
 		return modules.Degraded, "spotify: failed to parse HTML"
 	}
-	if ogType, _ := doc.Find(`meta[property="og:type"]`).Attr("content"); ogType == "profile" {
+	if isProfilePage(doc) {
 		return modules.Healthy, "spotify: OK"
 	}
 	return modules.Degraded, "spotify: unexpected response"
+}
+
+func isProfilePage(doc *goquery.Document) bool {
+	if ogType, _ := doc.Find(`meta[property="og:type"]`).Attr("content"); ogType == "profile" {
+		return true
+	}
+
+	title, hasTitle := doc.Find(`meta[property="og:title"]`).Attr("content")
+	desc, _ := doc.Find(`meta[property="og:description"]`).Attr("content")
+	canonical, _ := doc.Find(`link[rel="canonical"]`).Attr("href")
+
+	return hasTitle && title != "" && strings.Contains(desc, "User") && strings.Contains(canonical, "/user/")
+}
+
+func spotifyHeaders() map[string]string {
+	return map[string]string{
+		"Accept":     "*/*",
+		"User-Agent": "basalt/2.0",
+	}
 }

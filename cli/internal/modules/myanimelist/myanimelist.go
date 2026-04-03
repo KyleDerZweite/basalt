@@ -7,9 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const defaultBaseURL = "https://api.jikan.moe"
@@ -46,9 +46,9 @@ func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclie
 	// Jikan API wraps the response in a "data" field
 	var respWrapper struct {
 		Data struct {
-			Username  string `json:"username"`
-			URL       string `json:"url"`
-			Images    struct {
+			Username string `json:"username"`
+			URL      string `json:"url"`
+			Images   struct {
 				JPG struct {
 					ImageURL string `json:"image_url"`
 				} `json:"jpg"`

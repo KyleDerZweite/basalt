@@ -1,4 +1,4 @@
-module github.com/kyle/basalt
+module github.com/KyleDerZweite/basalt
 
 go 1.25.7
 

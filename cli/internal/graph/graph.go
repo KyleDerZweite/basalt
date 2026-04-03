@@ -18,10 +18,10 @@ type Graph struct {
 
 	Meta Meta `json:"meta"`
 
-	edgeCounter   atomic.Int64
-	modulesRun    atomic.Int64
-	nodesFound    atomic.Int64
-	errorCount    atomic.Int64
+	edgeCounter atomic.Int64
+	modulesRun  atomic.Int64
+	nodesFound  atomic.Int64
+	errorCount  atomic.Int64
 }
 
 // Meta contains scan metadata for the output.

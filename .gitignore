@@ -17,3 +17,7 @@ vendor/
 
 # Basalt runtime
 *.json.tmp
+
+.codex
+
+*basalt-scan*.json

@@ -9,9 +9,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const githubAPI = "https://api.github.com"
@@ -27,8 +27,10 @@ func New(token string) *Module {
 	return &Module{baseURL: githubAPI, token: token}
 }
 
-func (m *Module) Name() string        { return "github" }
-func (m *Module) Description() string { return "Extract profile, email, domain, and social links from GitHub" }
+func (m *Module) Name() string { return "github" }
+func (m *Module) Description() string {
+	return "Extract profile, email, domain, and social links from GitHub"
+}
 
 func (m *Module) CanHandle(nodeType string) bool {
 	return nodeType == "username" || nodeType == "email"

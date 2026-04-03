@@ -11,9 +11,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const defaultCTBaseURL = "https://crt.sh"
@@ -49,8 +49,10 @@ func New() *Module {
 	}
 }
 
-func (m *Module) Name() string        { return "dnsct" }
-func (m *Module) Description() string { return "DNS lookups and certificate transparency subdomain discovery" }
+func (m *Module) Name() string { return "dnsct" }
+func (m *Module) Description() string {
+	return "DNS lookups and certificate transparency subdomain discovery"
+}
 
 func (m *Module) CanHandle(nodeType string) bool {
 	return nodeType == "domain"
@@ -122,15 +124,17 @@ func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclie
 }
 
 func (m *Module) Verify(ctx context.Context, client *httpclient.Client) (modules.HealthStatus, string) {
-	ctURL := fmt.Sprintf("%s/?q=%s&output=json", m.ctBaseURL, url.QueryEscape("example.com"))
-	resp, err := client.Do(ctx, ctURL, nil)
-	if err != nil {
-		return modules.Offline, fmt.Sprintf("dnsct: %v", err)
+	_, hostErr := m.resolver.LookupHost(ctx, "example.com")
+	_, mxErr := m.resolver.LookupMX(ctx, "example.com")
+	if hostErr != nil && mxErr != nil {
+		return modules.Offline, fmt.Sprintf("dnsct: DNS unavailable (%v / %v)", hostErr, mxErr)
 	}
-	if resp.StatusCode == 200 {
+
+	if _, err := m.queryCT(ctx, "example.com", client); err == nil {
 		return modules.Healthy, "dnsct: OK"
+	} else {
+		return modules.Degraded, fmt.Sprintf("dnsct: DNS OK, crt.sh unavailable (%v)", err)
 	}
-	return modules.Offline, fmt.Sprintf("dnsct: crt.sh status %d", resp.StatusCode)
 }
 
 // queryCT fetches Certificate Transparency subdomains from crt.sh.

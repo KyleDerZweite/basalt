@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 	"github.com/PuerkitoBio/goquery"
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
 )
 
 const defaultBaseURL = "https://medium.com"
@@ -33,10 +33,7 @@ func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclie
 	username := node.Label
 	url := fmt.Sprintf("%s/@%s", m.baseURL, username)
 
-	// Medium blocks default browser UAs but allows simple ones.
-	resp, err := client.Do(ctx, url, map[string]string{
-		"User-Agent": "basalt/2.0",
-	})
+	resp, err := client.Do(ctx, url, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("medium request: %w", err)
 	}
@@ -89,11 +86,12 @@ func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclie
 
 func (m *Module) Verify(ctx context.Context, client *httpclient.Client) (modules.HealthStatus, string) {
 	url := fmt.Sprintf("%s/@ev", m.baseURL)
-	resp, err := client.Do(ctx, url, map[string]string{
-		"User-Agent": "basalt/2.0",
-	})
+	resp, err := client.Do(ctx, url, nil)
 	if err != nil {
 		return modules.Offline, fmt.Sprintf("medium: %v", err)
+	}
+	if resp.StatusCode == 403 || resp.StatusCode == 429 {
+		return modules.Offline, fmt.Sprintf("medium: blocked by Cloudflare or rate limit (%d)", resp.StatusCode)
 	}
 	if resp.StatusCode != 200 {
 		return modules.Degraded, fmt.Sprintf("medium: status %d", resp.StatusCode)

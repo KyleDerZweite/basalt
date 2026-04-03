@@ -8,7 +8,7 @@ This is a Go CLI tool. All source is in `cli/`. Read the code, not this file, fo
 
 Entry point: `cli/main.go` -> `cli/cmd/root.go` (Cobra CLI).
 
-Module path: `github.com/kyle/basalt`.
+Module path: `github.com/KyleDerZweite/basalt`.
 
 ## Build & Run
 

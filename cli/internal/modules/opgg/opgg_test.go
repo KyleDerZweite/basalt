@@ -8,14 +8,21 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const foundHTML = `<html><head>
 <meta property="og:title" content="TestPlayer#EUW - Summoner Stats - League of Legends" />
 <meta property="og:description" content="TestPlayer#EUW / Lv. 120" />
+<meta property="og:site_name" content="OP.GG" />
+</head><body></body></html>`
+
+const genericSearchHTML = `<html><head>
+<meta property="og:title" content="OP.GG - The Best LoL Builds and Tier List. Search Riot ID and Tagline for Stats" />
+<meta property="og:description" content="The Best LoL Champion Builds and Player Stats by OP.GG" />
+<meta property="og:url" content="https://op.gg/lol/summoners/search" />
 <meta property="og:site_name" content="OP.GG" />
 </head><body></body></html>`
 
@@ -98,5 +105,22 @@ func TestVerifyHealthy(t *testing.T) {
 	status, msg := m.Verify(context.Background(), client)
 	if status != modules.Healthy {
 		t.Errorf("expected Healthy, got %d: %s", status, msg)
+	}
+}
+
+func TestVerifyDegradedForGenericSearchPage(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(genericSearchHTML))
+	}))
+	defer srv.Close()
+
+	m := New()
+	m.baseURL = srv.URL
+
+	client := httpclient.New()
+	status, _ := m.Verify(context.Background(), client)
+	if status != modules.Degraded {
+		t.Errorf("expected Degraded, got %d", status)
 	}
 }

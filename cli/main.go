@@ -20,7 +20,7 @@
 
 package main
 
-import "github.com/kyle/basalt/cmd"
+import "github.com/KyleDerZweite/basalt/cmd"
 
 func main() {
 	cmd.Execute()

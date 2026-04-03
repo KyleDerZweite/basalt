@@ -8,10 +8,10 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 	"github.com/PuerkitoBio/goquery"
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
 )
 
 const defaultBaseURL = "https://www.op.gg"
@@ -123,8 +123,12 @@ func (m *Module) Verify(ctx context.Context, client *httpclient.Client) (modules
 		return modules.Degraded, "opgg: failed to parse HTML"
 	}
 	title, _ := doc.Find(`meta[property="og:title"]`).Attr("content")
+	ogURL, _ := doc.Find(`meta[property="og:url"]`).Attr("content")
 	if strings.Contains(title, "Summoner Stats") {
 		return modules.Healthy, "opgg: OK"
+	}
+	if strings.Contains(title, "Search Riot ID and Tagline") && strings.Contains(ogURL, "/lol/summoners/search") {
+		return modules.Degraded, "opgg: search now requires exact Riot ID + tagline"
 	}
 	return modules.Degraded, "opgg: unexpected response"
 }

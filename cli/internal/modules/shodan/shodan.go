@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const defaultBaseURL = "https://internetdb.shodan.io"
@@ -51,8 +51,10 @@ func New() *Module {
 	}
 }
 
-func (m *Module) Name() string        { return "shodan" }
-func (m *Module) Description() string { return "Open ports, vulnerabilities, and services via Shodan InternetDB" }
+func (m *Module) Name() string { return "shodan" }
+func (m *Module) Description() string {
+	return "Open ports, vulnerabilities, and services via Shodan InternetDB"
+}
 
 func (m *Module) CanHandle(nodeType string) bool {
 	return nodeType == "domain"

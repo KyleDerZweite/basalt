@@ -8,9 +8,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const (
@@ -32,7 +32,7 @@ func New() *Module {
 	}
 }
 
-func (m *Module) Name() string                  { return "roblox" }
+func (m *Module) Name() string                   { return "roblox" }
 func (m *Module) Description() string            { return "Extract profile data from Roblox via username lookup" }
 func (m *Module) CanHandle(nodeType string) bool { return nodeType == "username" }
 
@@ -103,7 +103,7 @@ func (m *Module) resolveUsername(ctx context.Context, client *httpclient.Client,
 	url := fmt.Sprintf("%s/v1/usernames/users", m.usersBaseURL)
 
 	reqBody := map[string]interface{}{
-		"usernames":         []string{username},
+		"usernames":          []string{username},
 		"excludeBannedUsers": false,
 	}
 	bodyBytes, err := json.Marshal(reqBody)
@@ -179,12 +179,12 @@ type usernameResponse struct {
 
 // profileResponse represents the full profile data from the user endpoint.
 type profileResponse struct {
-	Description            string `json:"description"`
-	Created                string `json:"created"`
-	IsBanned               bool   `json:"isBanned"`
+	Description            string      `json:"description"`
+	Created                string      `json:"created"`
+	IsBanned               bool        `json:"isBanned"`
 	ExternalAppDisplayName interface{} `json:"externalAppDisplayName"`
-	HasVerifiedBadge       bool   `json:"hasVerifiedBadge"`
-	ID                     int64  `json:"id"`
-	Name                   string `json:"name"`
-	DisplayName            string `json:"displayName"`
+	HasVerifiedBadge       bool        `json:"hasVerifiedBadge"`
+	ID                     int64       `json:"id"`
+	Name                   string      `json:"name"`
+	DisplayName            string      `json:"displayName"`
 }

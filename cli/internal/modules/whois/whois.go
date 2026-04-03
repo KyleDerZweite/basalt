@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const defaultBaseURL = "https://rdap.org"
@@ -42,7 +42,7 @@ type rdapResponse struct {
 }
 
 type rdapEntity struct {
-	Roles     []string     `json:"roles"`
+	Roles      []string      `json:"roles"`
 	VCardArray []interface{} `json:"vcardArray"`
 }
 

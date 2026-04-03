@@ -9,9 +9,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 func TestCanHandle(t *testing.T) {
@@ -134,6 +134,28 @@ func TestVerifyHealthy(t *testing.T) {
 				"available": true,
 			},
 		},
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(payload)
+	}))
+	defer srv.Close()
+
+	m := New()
+	m.baseURL = srv.URL
+
+	client := httpclient.New()
+	status, msg := m.Verify(context.Background(), client)
+	if status != modules.Healthy {
+		t.Errorf("expected Healthy, got %d: %s", status, msg)
+	}
+}
+
+func TestVerifyHealthyWithoutSnapshot(t *testing.T) {
+	payload := map[string]interface{}{
+		"url":                "example.com",
+		"archived_snapshots": map[string]interface{}{},
 	}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

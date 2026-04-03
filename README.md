@@ -1,6 +1,6 @@
 # Basalt
 
-Relational OSINT tool for discovering your digital footprint. Basalt runs 29 purpose-built modules against usernames, emails, and domains, then builds a relationship graph of everything it finds.
+Relational OSINT tool for discovering your digital footprint. Basalt runs 37 purpose-built modules against usernames, emails, and domains, then builds a relationship graph of everything it finds.
 
 Unlike tools that spray thousands of sites with URL templates, Basalt uses per-module logic with structured API calls, HTML scraping, and module-level health checks. Each module scores its own confidence. No false positives from generic status code matching.
 
@@ -9,16 +9,12 @@ Unlike tools that spray thousands of sites with URL templates, Basalt uses per-m
 ## Install
 
 ```bash
-go install github.com/kylederzweite/basalt@latest
-```
-
-Or build from source:
-
-```bash
 git clone https://github.com/KyleDerZweite/basalt.git
-cd basalt && cd cli
+cd basalt/cli
 go build -o basalt .
 ```
+
+The canonical repository is `https://github.com/KyleDerZweite/basalt`.
 
 ## Usage
 
@@ -66,16 +62,17 @@ Terminal output is a color-coded table sorted by confidence score (green >= 0.80
 
 ## Modules
 
-29 modules across 8 categories:
+37 modules across 9 categories:
 
 | Category | Modules | Seed Types |
 |----------|---------|------------|
 | Identity | Gravatar, Keybase | email, username |
-| Dev/Tech | GitHub, GitLab, StackExchange, Docker Hub, DEV.to, Hacker News | username, email |
-| Social | Reddit, YouTube, Twitch, Discord, Instagram, TikTok, Medium, Telegram | username |
+| Dev/Tech | GitHub, GitLab, Codeberg, Codeforces, StackExchange, Docker Hub, DEV.to, Hacker News | username, email |
+| Social | Reddit, YouTube, Twitch, Discord, Instagram, TikTok, Medium, Telegram, Wattpad | username |
 | Link-in-Bio | Linktree, Beacons, Carrd, Bento | username |
 | Comms | Matrix | username |
-| Gaming | Steam, OP.GG, Spotify | username |
+| Gaming | Steam, OP.GG, Spotify, Chess.com, Lichess, MyAnimeList, Roblox | username |
+| Productivity | Trello | username |
 | Domain | WHOIS/RDAP, DNS/CT | domain |
 | Infrastructure | Shodan, Wayback Machine, IPinfo | domain |
 

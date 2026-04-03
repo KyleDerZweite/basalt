@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 	"github.com/PuerkitoBio/goquery"
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
 )
 
 const twitchURL = "https://www.twitch.tv"
@@ -25,8 +25,8 @@ func New() *Module {
 	return &Module{baseURL: twitchURL}
 }
 
-func (m *Module) Name() string                  { return "twitch" }
-func (m *Module) Description() string           { return "Extract profile data from Twitch channel pages" }
+func (m *Module) Name() string                   { return "twitch" }
+func (m *Module) Description() string            { return "Extract profile data from Twitch channel pages" }
 func (m *Module) CanHandle(nodeType string) bool { return nodeType == "username" }
 
 func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclient.Client) ([]*graph.Node, []*graph.Edge, error) {

@@ -5,8 +5,8 @@ package modules
 import (
 	"context"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
 )
 
 // HealthStatus represents the operational state of a module.

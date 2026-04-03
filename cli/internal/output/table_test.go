@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kyle/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/graph"
 )
 
 func testGraph() *graph.Graph {

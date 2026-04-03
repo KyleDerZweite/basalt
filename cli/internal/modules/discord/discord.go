@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const discordURL = "https://discord.com"
@@ -25,8 +25,8 @@ func New() *Module {
 	return &Module{baseURL: discordURL}
 }
 
-func (m *Module) Name() string                  { return "discord" }
-func (m *Module) Description() string           { return "Check Discord username existence via validation API" }
+func (m *Module) Name() string                   { return "discord" }
+func (m *Module) Description() string            { return "Check Discord username existence via validation API" }
 func (m *Module) CanHandle(nodeType string) bool { return nodeType == "username" }
 
 func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclient.Client) ([]*graph.Node, []*graph.Edge, error) {
@@ -41,6 +41,9 @@ func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclie
 	resp, err := client.DoRequest(ctx, "POST", url, strings.NewReader(reqBody), headers)
 	if err != nil {
 		return nil, nil, fmt.Errorf("discord request: %w", err)
+	}
+	if resp.StatusCode == 404 {
+		return nil, nil, nil
 	}
 	if resp.StatusCode != 200 {
 		return nil, nil, fmt.Errorf("discord returned %d", resp.StatusCode)
@@ -83,6 +86,12 @@ func (m *Module) Verify(ctx context.Context, client *httpclient.Client) (modules
 	}
 	if resp.StatusCode == 200 {
 		return modules.Healthy, "discord: OK"
+	}
+	if resp.StatusCode == 404 {
+		return modules.Offline, "discord: validation endpoint removed (404)"
+	}
+	if resp.StatusCode == 403 || resp.StatusCode == 429 {
+		return modules.Offline, fmt.Sprintf("discord: blocked (%d)", resp.StatusCode)
 	}
 	return modules.Degraded, fmt.Sprintf("discord: unexpected status %d", resp.StatusCode)
 }

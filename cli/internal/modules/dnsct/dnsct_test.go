@@ -10,14 +10,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 // mockResolver returns predictable DNS results for testing.
 type mockResolver struct {
-	hosts []string
+	hosts   []string
 	hostErr error
 	mx      []*net.MX
 	mxErr   error
@@ -204,10 +204,28 @@ func TestVerifyHealthy(t *testing.T) {
 
 	m := New()
 	m.ctBaseURL = srv.URL
+	m.resolver = &mockResolver{hosts: []string{"93.184.216.34"}}
 
 	client := httpclient.New()
 	status, msg := m.Verify(context.Background(), client)
 	if status != modules.Healthy {
 		t.Errorf("expected Healthy, got %d: %s", status, msg)
+	}
+}
+
+func TestVerifyDegradedWhenCTUnavailable(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer srv.Close()
+
+	m := New()
+	m.ctBaseURL = srv.URL
+	m.resolver = &mockResolver{hosts: []string{"93.184.216.34"}}
+
+	client := httpclient.New()
+	status, _ := m.Verify(context.Background(), client)
+	if status != modules.Degraded {
+		t.Errorf("expected Degraded, got %d", status)
 	}
 }

@@ -7,9 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const chesscomBaseURL = "https://api.chess.com"
@@ -47,19 +47,19 @@ func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclie
 	}
 
 	var profile struct {
-		Username    string `json:"username"`
-		Name        string `json:"name"`
-		Avatar      string `json:"avatar"`
-		URL         string `json:"url"`
-		Country     string `json:"country"`
-		Location    string `json:"location"`
-		Title       string `json:"title"`
-		Followers   int    `json:"followers"`
-		Joined      int64  `json:"joined"`
-		LastOnline  int64  `json:"last_online"`
-		Status      string `json:"status"`
-		IsStreamer  bool   `json:"is_streamer"`
-		TwitchURL   string `json:"twitch_url"`
+		Username   string `json:"username"`
+		Name       string `json:"name"`
+		Avatar     string `json:"avatar"`
+		URL        string `json:"url"`
+		Country    string `json:"country"`
+		Location   string `json:"location"`
+		Title      string `json:"title"`
+		Followers  int    `json:"followers"`
+		Joined     int64  `json:"joined"`
+		LastOnline int64  `json:"last_online"`
+		Status     string `json:"status"`
+		IsStreamer bool   `json:"is_streamer"`
+		TwitchURL  string `json:"twitch_url"`
 	}
 	if err := json.Unmarshal([]byte(resp.Body), &profile); err != nil {
 		return nil, nil, fmt.Errorf("parsing chesscom response: %w", err)

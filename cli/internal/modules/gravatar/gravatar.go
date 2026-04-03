@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const gravatarAPI = "https://en.gravatar.com"
@@ -26,7 +26,7 @@ func New() *Module {
 	return &Module{baseURL: gravatarAPI}
 }
 
-func (m *Module) Name() string                  { return "gravatar" }
+func (m *Module) Name() string                   { return "gravatar" }
 func (m *Module) Description() string            { return "Extract profile data from Gravatar via email hash" }
 func (m *Module) CanHandle(nodeType string) bool { return nodeType == "email" }
 
@@ -48,10 +48,10 @@ func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclie
 
 	var data struct {
 		Entry []struct {
-			DisplayName      string `json:"displayName"`
+			DisplayName       string `json:"displayName"`
 			PreferredUsername string `json:"preferredUsername"`
-			ThumbnailURL     string `json:"thumbnailUrl"`
-			URLs             []struct {
+			ThumbnailURL      string `json:"thumbnailUrl"`
+			URLs              []struct {
 				Value string `json:"value"`
 			} `json:"urls"`
 		} `json:"entry"`
@@ -60,10 +60,10 @@ func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclie
 	// The single-profile endpoint returns a flat object, not wrapped in "entry".
 	// Try to parse as-is first (for test server), then try the real API format.
 	var profile struct {
-		DisplayName      string `json:"displayName"`
+		DisplayName       string `json:"displayName"`
 		PreferredUsername string `json:"preferredUsername"`
-		ThumbnailURL     string `json:"thumbnailUrl"`
-		URLs             []struct {
+		ThumbnailURL      string `json:"thumbnailUrl"`
+		URLs              []struct {
 			Value string `json:"value"`
 		} `json:"urls"`
 	}

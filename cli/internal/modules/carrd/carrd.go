@@ -9,9 +9,9 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 
-	"github.com/kyle/basalt/internal/graph"
-	"github.com/kyle/basalt/internal/httpclient"
-	"github.com/kyle/basalt/internal/modules"
+	"github.com/KyleDerZweite/basalt/internal/graph"
+	"github.com/KyleDerZweite/basalt/internal/httpclient"
+	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
 const carrdSuffix = ".carrd.co"
@@ -30,8 +30,10 @@ type Module struct {
 
 func New() *Module { return &Module{baseURL: carrdSuffix} }
 
-func (m *Module) Name() string                  { return "carrd" }
-func (m *Module) Description() string            { return "Scrape Carrd.co profiles for linked accounts and websites" }
+func (m *Module) Name() string { return "carrd" }
+func (m *Module) Description() string {
+	return "Scrape Carrd.co profiles for linked accounts and websites"
+}
 func (m *Module) CanHandle(nodeType string) bool { return nodeType == "username" }
 
 // profileURL builds the profile URL for the given username.

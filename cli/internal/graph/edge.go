@@ -9,7 +9,7 @@ const (
 	EdgeTypeHasAccount   = "has_account"
 	EdgeTypeHasEmail     = "has_email"
 	EdgeTypeHasDomain    = "has_domain"
-	EdgeTypeHasUsername   = "has_username"
+	EdgeTypeHasUsername  = "has_username"
 	EdgeTypeRegisteredTo = "registered_to"
 	EdgeTypeResolvesTo   = "resolves_to"
 	EdgeTypeLinkedTo     = "linked_to"
