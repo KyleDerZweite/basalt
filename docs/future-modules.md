@@ -3,13 +3,22 @@
 ## Implemented
 
 The following were previously listed here and are now implemented:
-Spotify, Medium, Telegram, Chess.com, Trello, Wattpad, MyAnimeList, Roblox, OP.GG, Lichess, Codeforces, Codeberg
+Spotify, Medium, Telegram, Chess.com, Trello, Wattpad, MyAnimeList, Roblox, OP.GG, Lichess, Codeforces, Codeberg, Security.txt
 
 ## 2026-04 Selection Notes
 
-These were the easiest modules to implement directly without bending existing patterns:
+These were the 2026-04 selections that fit existing patterns best:
 
-### 1. Lichess
+### 1. Security.txt
+- Reason: domain coverage is still thin compared to username coverage, and `security.txt` is a zero-auth, standards-based source with deterministic fetch paths
+- Reliability: `GET /.well-known/security.txt` with `GET /security.txt` fallback is straightforward and easy to test with fixed fixtures
+- Graph fit: account properties, direct `email` pivots from `Contact: mailto:`, `website` pivots from HTTP contacts, and derived `domain` pivots from linked hosts
+- Verify seed: `securitytxt.org`
+- Manual smoke test:
+  - `curl -fsSL https://securitytxt.org/.well-known/security.txt`
+  - `cd cli && go test ./internal/modules/securitytxt/ -v`
+
+### 2. Lichess
 - Reason: zero-auth JSON API, deterministic username lookup, no scraping, same `username -> account/profile links` shape already used by existing username modules
 - Reliability: `GET /api/user/{username}` is a clean `200` or `404`
 - Graph fit: account properties, optional `full_name`, and linked `website` nodes from `profile.links`
@@ -18,7 +27,7 @@ These were the easiest modules to implement directly without bending existing pa
   - `curl -fsSL https://lichess.org/api/user/lichess`
   - `cd cli && go test ./internal/modules/lichess/ -v`
 
-### 2. Codeforces
+### 3. Codeforces
 - Reason: zero-auth JSON API, high-signal profile metadata, stable response schema, and no custom auth or scraping
 - Reliability: `GET /api/user.info?handles={username}` returns structured JSON for both found and not-found cases
 - Graph fit: account properties plus optional `full_name`, `avatar_url`, and `organization`
@@ -27,7 +36,7 @@ These were the easiest modules to implement directly without bending existing pa
   - `curl -fsSL 'https://codeforces.com/api/user.info?handles=tourist'`
   - `cd cli && go test ./internal/modules/codeforces/ -v`
 
-### 3. Codeberg
+### 4. Codeberg
 - Reason: Gitea-style API that closely matches the existing GitLab and GitHub module patterns
 - Reliability: `GET /api/v1/users/{username}` is a clean `200` or `404`
 - Graph fit: account, optional `full_name`, `avatar_url`, `website`, and derived `domain`
@@ -37,8 +46,9 @@ These were the easiest modules to implement directly without bending existing pa
   - `cd cli && go test ./internal/modules/codeberg/ -v`
 
 Deferred despite being attractive:
-- Bluesky: public API works, but handle churn makes long-lived verify targets less robust than the three selected here
-- Speedrun.com: username lookup is search-based and less deterministic than direct profile endpoints
+- Bluesky: public API works, and it is still the best next username module, but domain coverage had the larger gap for this sprint
+- Speedrun.com: deferred on April 4, 2026 after a live probe returned a real user for a bogus `name=` lookup, which makes the current search path too nondeterministic for default scans
+- ArtStation: deferred on April 4, 2026 because the documented `profile.json` endpoint returned `403`
 - WakaTime and HackerRank: privacy and availability constraints make them less reliable for default scanning
 - BuyMeACoffee and most Tier 2 ideas: scraping-heavy and inconsistent with the current codebase's preferred API-first modules
 
@@ -50,7 +60,7 @@ Deferred despite being attractive:
 - URL: `GET https://www.speedrun.com/api/v1/users?name={username}` or `/users/{id}`
 - Detection: 200 with populated `data` array / empty array
 - Data: country/region, signup date, pronouns, **linked social accounts (Twitch, YouTube, Hitbox, Twitter)**
-- Notes: Cross-platform links are pivotable — high value. API (v1) not actively maintained, pagination breaks at 10,000 items
+- Notes: Cross-platform links are pivotable - high value. API (v1) not actively maintained, pagination breaks at 10,000 items. A live probe on April 4, 2026 returned a real user for a bogus `name=` lookup, so this needs a deterministic fetch strategy before implementation
 
 ### Bluesky (username)
 - URL: `GET https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor={username}`
@@ -69,7 +79,7 @@ Deferred despite being attractive:
 - URL: `GET https://www.artstation.com/users/{username}/profile.json`
 - Detection: 200 (JSON) / 404
 - Data: display name, bio, avatar, follower count, portfolio stats
-- Notes: Professional digital artists and game developers
+- Notes: Professional digital artists and game developers. Deferred on April 4, 2026 because the documented JSON endpoint returned `403`
 
 ### HackerRank (username)
 - URL: `GET https://www.hackerrank.com/rest/contests/master/hackers/{username}/profile`
@@ -232,11 +242,15 @@ Deferred despite being attractive:
 - Data: Every historical SSL certificate, SANs (subdomains), issuer DN contact emails
 - Notes: Direct PostgreSQL access bypasses web UI pagination limits. Older certificates often contain admin email addresses
 
-### security.txt / humans.txt (domain)
-- URLs: `https://{domain}/.well-known/security.txt`, `https://{domain}/humans.txt`
-- security.txt: CISO/security team email, PGP key link, disclosure policy
-- humans.txt: Real names, Twitter handles, personal websites of engineering team
-- Notes: Pivot from abstract corporate domain directly to specific engineers
+### Security.txt (domain)
+- URLs: `https://{domain}/.well-known/security.txt`, `https://{domain}/security.txt`
+- Data: security team email contacts, policy URLs, acknowledgments pages, hiring pages, encryption key URLs
+- Notes: Implemented in April 2026 as the next domain-focused module because it is standards-based and deterministic
+
+### humans.txt (domain)
+- URL: `https://{domain}/humans.txt`
+- Data: real names, Twitter handles, personal websites of engineering team
+- Notes: Still attractive, but remains separate from `security.txt` because the format is heuristic-heavy and less standardized
 
 ### Paste Repository Search (username/email)
 - Paste.ee API: `GET https://api.paste.ee/v1/pastes` (requires X-Auth-Token)

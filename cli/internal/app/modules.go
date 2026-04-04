@@ -30,6 +30,7 @@ import (
 	"github.com/KyleDerZweite/basalt/internal/modules/opgg"
 	"github.com/KyleDerZweite/basalt/internal/modules/reddit"
 	"github.com/KyleDerZweite/basalt/internal/modules/roblox"
+	"github.com/KyleDerZweite/basalt/internal/modules/securitytxt"
 	"github.com/KyleDerZweite/basalt/internal/modules/shodan"
 	"github.com/KyleDerZweite/basalt/internal/modules/spotify"
 	"github.com/KyleDerZweite/basalt/internal/modules/stackexchange"
@@ -81,6 +82,7 @@ var moduleFactories = []moduleFactory{
 	func(*config.Config) modules.Module { return wattpad.New() },
 	func(*config.Config) modules.Module { return whois.New() },
 	func(*config.Config) modules.Module { return dnsct.New() },
+	func(*config.Config) modules.Module { return securitytxt.New() },
 	func(*config.Config) modules.Module { return shodan.New() },
 	func(*config.Config) modules.Module { return wayback.New() },
 	func(*config.Config) modules.Module { return ipinfo.New() },
