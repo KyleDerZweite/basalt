@@ -5,6 +5,7 @@ package walker
 import (
 	"context"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -274,5 +275,65 @@ func TestWalkerGracefulShutdown(t *testing.T) {
 		// Run returned promptly after cancellation.
 	case <-time.After(2 * time.Second):
 		t.Fatal("Run did not return within 2s after context cancellation")
+	}
+}
+
+func TestWalkerEmitsEvents(t *testing.T) {
+	g := graph.New()
+	reg := modules.NewRegistry()
+
+	mod := &fakeModule{
+		name:    "github",
+		handles: []string{"username"},
+		health:  modules.Healthy,
+		extractFn: func(_ context.Context, _ *graph.Node) ([]*graph.Node, []*graph.Edge, error) {
+			node := graph.NewNode(graph.NodeTypeEmail, "user@example.com", "github")
+			node.Confidence = 0.9
+			edge := graph.NewEdge(0, "seed:username:testuser", node.ID, graph.EdgeTypeHasEmail, "github")
+			return []*graph.Node{node}, []*graph.Edge{edge}, nil
+		},
+	}
+	reg.Register(mod)
+
+	var (
+		mu     sync.Mutex
+		events []Event
+	)
+	w := New(
+		g,
+		reg,
+		WithEventHandler(func(event Event) {
+			mu.Lock()
+			defer mu.Unlock()
+			events = append(events, event)
+		}),
+	)
+	w.Run(context.Background(), []graph.Seed{{Type: "username", Value: "testuser"}})
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if len(events) == 0 {
+		t.Fatal("expected walker events")
+	}
+
+	var foundVerify, foundStarted, foundNode, foundEdge, foundFinished bool
+	for _, event := range events {
+		switch event.Type {
+		case "module_verified":
+			foundVerify = true
+		case "module_started":
+			foundStarted = true
+		case "node_discovered":
+			foundNode = true
+		case "edge_discovered":
+			foundEdge = true
+		case "module_finished":
+			foundFinished = true
+		}
+	}
+
+	if !foundVerify || !foundStarted || !foundNode || !foundEdge || !foundFinished {
+		t.Fatalf("missing expected events: %+v", events)
 	}
 }

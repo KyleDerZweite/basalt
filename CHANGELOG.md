@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Local product backend with persisted scan history, SQLite storage, local settings, and scan event streams
+- `basalt serve` command for the local desktop/web product API
+- HTTP API endpoints for scans, results, events, exports, module health, and settings
+- Walker progress events for module verification, execution, discoveries, and failures
+
+### Changed
+- `scan` now uses the shared application service layer instead of wiring the walker directly in the command
+- Scan runs are persisted locally and can be re-exported later from the local API
+- Default local app data lives in `~/.basalt`
+
 ## [0.2.0] - 2026-03-31
 
 ### Added

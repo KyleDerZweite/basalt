@@ -21,6 +21,20 @@ const (
 	Offline
 )
 
+// String returns the wire-safe name for the health status.
+func (s HealthStatus) String() string {
+	switch s {
+	case Healthy:
+		return "healthy"
+	case Degraded:
+		return "degraded"
+	case Offline:
+		return "offline"
+	default:
+		return "unknown"
+	}
+}
+
 // Module is the interface every OSINT extraction module must implement.
 type Module interface {
 	// Name returns a human-readable identifier (e.g., "github").

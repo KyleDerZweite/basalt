@@ -128,6 +128,15 @@ func (g *Graph) SnapshotStats() {
 	g.Meta.Stats.Errors = int(g.errorCount.Load())
 }
 
+// RestoreStats hydrates atomic counters after loading a persisted graph.
+func (g *Graph) RestoreStats(stats Stats, edgeCount int) {
+	g.Meta.Stats = stats
+	g.modulesRun.Store(int64(stats.ModulesRun))
+	g.nodesFound.Store(int64(stats.NodesFound))
+	g.errorCount.Store(int64(stats.Errors))
+	g.edgeCounter.Store(int64(edgeCount))
+}
+
 // graphOutput is the JSON serialization format.
 type graphOutput struct {
 	Meta  Meta    `json:"meta"`

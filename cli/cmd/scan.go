@@ -10,52 +10,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/spf13/cobra"
-
-	"github.com/KyleDerZweite/basalt/internal/config"
+	"github.com/KyleDerZweite/basalt/internal/app"
 	"github.com/KyleDerZweite/basalt/internal/graph"
-	"github.com/KyleDerZweite/basalt/internal/httpclient"
-	"github.com/KyleDerZweite/basalt/internal/modules"
-	"github.com/KyleDerZweite/basalt/internal/modules/beacons"
-	"github.com/KyleDerZweite/basalt/internal/modules/bento"
-	"github.com/KyleDerZweite/basalt/internal/modules/carrd"
-	"github.com/KyleDerZweite/basalt/internal/modules/chesscom"
-	"github.com/KyleDerZweite/basalt/internal/modules/codeberg"
-	"github.com/KyleDerZweite/basalt/internal/modules/codeforces"
-	"github.com/KyleDerZweite/basalt/internal/modules/devto"
-	"github.com/KyleDerZweite/basalt/internal/modules/discord"
-	"github.com/KyleDerZweite/basalt/internal/modules/dnsct"
-	"github.com/KyleDerZweite/basalt/internal/modules/dockerhub"
-	"github.com/KyleDerZweite/basalt/internal/modules/github"
-	"github.com/KyleDerZweite/basalt/internal/modules/gitlab"
-	"github.com/KyleDerZweite/basalt/internal/modules/gravatar"
-	"github.com/KyleDerZweite/basalt/internal/modules/hackernews"
-	"github.com/KyleDerZweite/basalt/internal/modules/instagram"
-	"github.com/KyleDerZweite/basalt/internal/modules/ipinfo"
-	"github.com/KyleDerZweite/basalt/internal/modules/keybase"
-	"github.com/KyleDerZweite/basalt/internal/modules/lichess"
-	"github.com/KyleDerZweite/basalt/internal/modules/linktree"
-	"github.com/KyleDerZweite/basalt/internal/modules/matrix"
-	"github.com/KyleDerZweite/basalt/internal/modules/medium"
-	"github.com/KyleDerZweite/basalt/internal/modules/myanimelist"
-	"github.com/KyleDerZweite/basalt/internal/modules/opgg"
-	"github.com/KyleDerZweite/basalt/internal/modules/reddit"
-	"github.com/KyleDerZweite/basalt/internal/modules/roblox"
-	"github.com/KyleDerZweite/basalt/internal/modules/shodan"
-	"github.com/KyleDerZweite/basalt/internal/modules/spotify"
-	"github.com/KyleDerZweite/basalt/internal/modules/stackexchange"
-	"github.com/KyleDerZweite/basalt/internal/modules/steam"
-	"github.com/KyleDerZweite/basalt/internal/modules/telegram"
-	"github.com/KyleDerZweite/basalt/internal/modules/tiktok"
-	"github.com/KyleDerZweite/basalt/internal/modules/trello"
-	"github.com/KyleDerZweite/basalt/internal/modules/twitch"
-	"github.com/KyleDerZweite/basalt/internal/modules/wattpad"
-	"github.com/KyleDerZweite/basalt/internal/modules/wayback"
-	"github.com/KyleDerZweite/basalt/internal/modules/whois"
-	"github.com/KyleDerZweite/basalt/internal/modules/youtube"
 	"github.com/KyleDerZweite/basalt/internal/output"
-	"github.com/KyleDerZweite/basalt/internal/walker"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -66,6 +24,7 @@ var (
 	flagConcurrency int
 	flagTimeout     int
 	flagConfigPath  string
+	flagDataDir     string
 	flagExport      []string
 	flagVerbose     bool
 )
@@ -93,189 +52,116 @@ func init() {
 	scanCmd.Flags().IntVar(&flagConcurrency, "concurrency", 5, "Maximum concurrent requests")
 	scanCmd.Flags().IntVar(&flagTimeout, "timeout", 10, "Per-module timeout in seconds")
 	scanCmd.Flags().StringVar(&flagConfigPath, "config", "", "Path to config file for API keys")
+	scanCmd.Flags().StringVar(&flagDataDir, "data-dir", app.DefaultDataDir(), "Path to local app data directory")
 	scanCmd.Flags().StringSliceVar(&flagExport, "export", nil, "Export format: json, csv")
 	scanCmd.Flags().BoolVarP(&flagVerbose, "verbose", "v", false, "Show module health and debug info")
 }
 
 func runScan(cmd *cobra.Command, args []string) error {
-	// Collect seeds.
-	var seeds []graph.Seed
-	for _, u := range flagUsernames {
-		seeds = append(seeds, graph.Seed{Type: "username", Value: u})
+	request := app.ScanRequest{
+		Seeds:          collectSeeds(),
+		Depth:          flagDepth,
+		Concurrency:    flagConcurrency,
+		TimeoutSeconds: flagTimeout,
+		ConfigPath:     flagConfigPath,
 	}
-	for _, e := range flagEmails {
-		seeds = append(seeds, graph.Seed{Type: "email", Value: e})
-	}
-	for _, d := range flagDomains {
-		seeds = append(seeds, graph.Seed{Type: "domain", Value: d})
-	}
-
-	if len(seeds) == 0 {
+	if len(request.Seeds) == 0 {
 		return fmt.Errorf("at least one seed required (-u, -e, or -d)")
 	}
 
-	// Load config.
-	configPath := flagConfigPath
-	if configPath == "" {
-		home, _ := os.UserHomeDir()
-		configPath = filepath.Join(home, ".basalt", "config")
-	}
-	cfg, err := config.Load(configPath)
+	service, err := app.NewService(Version, flagDataDir)
 	if err != nil {
-		return fmt.Errorf("loading config: %w", err)
+		return err
 	}
+	defer service.Close()
 
-	// Build HTTP client.
-	client := httpclient.New(
-		httpclient.WithTimeout(time.Duration(flagTimeout) * time.Second),
-	)
-
-	// Register all modules.
-	reg := modules.NewRegistry()
-	reg.Register(gravatar.New())
-	reg.Register(linktree.New())
-	reg.Register(beacons.New())
-	reg.Register(carrd.New())
-	reg.Register(bento.New())
-	reg.Register(github.New(cfg.Get("GITHUB_TOKEN")))
-	reg.Register(gitlab.New())
-	reg.Register(codeberg.New())
-	reg.Register(codeforces.New())
-	reg.Register(stackexchange.New())
-	reg.Register(reddit.New())
-	reg.Register(roblox.New())
-	reg.Register(youtube.New())
-	reg.Register(twitch.New())
-	reg.Register(discord.New())
-	reg.Register(instagram.New())
-	reg.Register(tiktok.New())
-	reg.Register(matrix.New())
-	reg.Register(steam.New())
-	reg.Register(spotify.New())
-	reg.Register(telegram.New())
-	reg.Register(medium.New())
-	reg.Register(myanimelist.New())
-	reg.Register(opgg.New())
-	reg.Register(keybase.New())
-	reg.Register(hackernews.New())
-	reg.Register(dockerhub.New())
-	reg.Register(devto.New())
-	reg.Register(chesscom.New())
-	reg.Register(lichess.New())
-	reg.Register(trello.New())
-	reg.Register(wattpad.New())
-	reg.Register(whois.New())
-	reg.Register(dnsct.New())
-	reg.Register(shodan.New())
-	reg.Register(wayback.New())
-	reg.Register(ipinfo.New())
-
-	// Build graph.
-	g := graph.New()
-	g.Meta.Version = Version
-	g.Meta.ScanID = uuid.New().String()
-	g.Meta.StartedAt = time.Now()
-	g.Meta.Config = graph.Config{
-		MaxPivotDepth: flagDepth,
-		Concurrency:   flagConcurrency,
-		TimeoutSecs:   flagTimeout,
+	health, err := service.ModuleHealth(context.Background(), request)
+	if err != nil {
+		return fmt.Errorf("verifying modules: %w", err)
 	}
-	for _, s := range seeds {
-		g.Meta.InitialSeeds = append(g.Meta.InitialSeeds, graph.SeedRef{Value: s.Value, Type: s.Type})
-	}
+	printHealthSummary(health, flagVerbose)
 
-	// Build walker.
-	w := walker.New(g, reg,
-		walker.WithMaxDepth(flagDepth),
-		walker.WithConcurrency(flagConcurrency),
-		walker.WithTimeout(time.Duration(flagTimeout)*time.Second),
-		walker.WithClient(client),
-	)
-
-	// Context with graceful shutdown.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt)
+	defer signal.Stop(sigCh)
+
 	go func() {
 		<-sigCh
 		fmt.Fprintln(os.Stderr, "\nInterrupted, finishing in-flight requests...")
 		cancel()
 	}()
 
-	// Verify modules and print health summary before scanning.
-	w.VerifyAll(ctx)
-	printHealthSummary(w.HealthSummary(), flagVerbose)
+	record, err := service.RunScan(ctx, request)
+	if err != nil {
+		return err
+	}
+	if record.Graph == nil {
+		return fmt.Errorf("scan completed without a graph")
+	}
 
-	// Run scan.
-	w.Run(ctx, seeds)
-
-	// Finalize metadata.
-	g.Meta.CompletedAt = time.Now()
-	g.Meta.DurationSecs = g.Meta.CompletedAt.Sub(g.Meta.StartedAt).Seconds()
-
-	// Default: table to stdout.
-	if err := output.WriteTable(os.Stdout, g); err != nil {
+	if err := output.WriteTable(os.Stdout, record.Graph); err != nil {
 		return fmt.Errorf("writing table: %w", err)
 	}
 
-	// Exports.
 	timestamp := time.Now().Format("20060102-150405")
 	for _, format := range flagExport {
-		switch format {
-		case "json":
-			path := fmt.Sprintf("basalt-scan-%s.json", timestamp)
-			f, err := os.Create(path)
-			if err != nil {
-				return fmt.Errorf("creating %s: %w", path, err)
-			}
-			if err := output.WriteJSON(f, g); err != nil {
-				f.Close()
-				return fmt.Errorf("writing JSON: %w", err)
-			}
-			f.Close()
-			fmt.Fprintf(os.Stderr, "Exported JSON to %s\n", path)
-
-		case "csv":
-			path := fmt.Sprintf("basalt-scan-%s.csv", timestamp)
-			f, err := os.Create(path)
-			if err != nil {
-				return fmt.Errorf("creating %s: %w", path, err)
-			}
-			if err := output.WriteCSV(f, g); err != nil {
-				f.Close()
-				return fmt.Errorf("writing CSV: %w", err)
-			}
-			f.Close()
-			fmt.Fprintf(os.Stderr, "Exported CSV to %s\n", path)
-
-		default:
-			fmt.Fprintf(os.Stderr, "Unknown export format: %s (use: json, csv)\n", format)
+		path := filepath.Clean(fmt.Sprintf("basalt-scan-%s.%s", timestamp, format))
+		file, err := os.Create(path)
+		if err != nil {
+			return fmt.Errorf("creating %s: %w", path, err)
 		}
+		if err := service.WriteExport(record.ID, format, file); err != nil {
+			file.Close()
+			return err
+		}
+		if err := file.Close(); err != nil {
+			return fmt.Errorf("closing %s: %w", path, err)
+		}
+		fmt.Fprintf(os.Stderr, "Exported %s to %s\n", format, path)
 	}
 
+	if record.Status == app.ScanStatusPartial || record.Status == app.ScanStatusCanceled {
+		fmt.Fprintf(os.Stderr, "Scan finished with status: %s\n", record.Status)
+	}
 	return nil
 }
 
-func printHealthSummary(health []walker.ModuleHealth, verbose bool) {
+func collectSeeds() []graph.Seed {
+	var seeds []graph.Seed
+	for _, username := range flagUsernames {
+		seeds = append(seeds, graph.Seed{Type: graph.NodeTypeUsername, Value: username})
+	}
+	for _, email := range flagEmails {
+		seeds = append(seeds, graph.Seed{Type: graph.NodeTypeEmail, Value: email})
+	}
+	for _, domain := range flagDomains {
+		seeds = append(seeds, graph.Seed{Type: graph.NodeTypeDomain, Value: domain})
+	}
+	return seeds
+}
+
+func printHealthSummary(health []app.ModuleStatus, verbose bool) {
 	var ready, degraded, offline int
-	for _, h := range health {
-		switch h.Status {
-		case modules.Healthy:
+	for _, item := range health {
+		switch item.Status {
+		case "healthy":
 			ready++
-		case modules.Degraded:
+		case "degraded":
 			degraded++
 			if verbose {
-				fmt.Fprintf(os.Stderr, "  [degraded] %s\n", h.Message)
+				fmt.Fprintf(os.Stderr, "  [degraded] %s: %s\n", item.Name, item.Message)
 			}
-		case modules.Offline:
+		case "offline":
 			offline++
 			if verbose {
-				fmt.Fprintf(os.Stderr, "  [offline]  %s\n", h.Message)
+				fmt.Fprintf(os.Stderr, "  [offline]  %s: %s\n", item.Name, item.Message)
 			}
 		}
 	}
+
 	fmt.Fprintf(os.Stderr, "Modules: %d ready", ready)
 	if degraded > 0 {
 		fmt.Fprintf(os.Stderr, ", %d degraded", degraded)

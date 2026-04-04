@@ -21,6 +21,17 @@ type ModuleHealth struct {
 	Message string
 }
 
+// Event captures progress emitted by the walker while verifying and scanning.
+type Event struct {
+	Time    time.Time              `json:"time"`
+	Type    string                 `json:"type"`
+	Module  string                 `json:"module,omitempty"`
+	NodeID  string                 `json:"node_id,omitempty"`
+	EdgeID  string                 `json:"edge_id,omitempty"`
+	Message string                 `json:"message,omitempty"`
+	Data    map[string]interface{} `json:"data,omitempty"`
+}
+
 // Walker is the async orchestrator that dispatches nodes to modules.
 type Walker struct {
 	graph       *graph.Graph
@@ -34,6 +45,7 @@ type Walker struct {
 	semaphore chan struct{}
 	inflight  sync.WaitGroup
 	processed sync.Map // "moduleName:nodeID" -> struct{}
+	onEvent   func(Event)
 }
 
 // Option configures the Walker.
@@ -50,6 +62,9 @@ func WithTimeout(d time.Duration) Option { return func(w *Walker) { w.timeout = 
 
 // WithClient sets the HTTP client used by modules.
 func WithClient(c *httpclient.Client) Option { return func(w *Walker) { w.client = c } }
+
+// WithEventHandler emits verification and scan progress events.
+func WithEventHandler(fn func(Event)) Option { return func(w *Walker) { w.onEvent = fn } }
 
 // New creates a Walker.
 func New(g *graph.Graph, reg *modules.Registry, opts ...Option) *Walker {
@@ -73,6 +88,21 @@ func New(g *graph.Graph, reg *modules.Registry, opts ...Option) *Walker {
 // HealthSummary returns the verified health of all modules.
 func (w *Walker) HealthSummary() []ModuleHealth {
 	return w.healthy
+}
+
+// SetHealthSummary overrides the verified health state before Run.
+func (w *Walker) SetHealthSummary(health []ModuleHealth) {
+	w.healthy = health
+}
+
+func (w *Walker) emit(event Event) {
+	if w.onEvent == nil {
+		return
+	}
+	if event.Time.IsZero() {
+		event.Time = time.Now().UTC()
+	}
+	w.onEvent(event)
 }
 
 // VerifyAll runs Verify on all registered modules. Call before Run
@@ -118,6 +148,14 @@ func (w *Walker) verifyModules(ctx context.Context) {
 			defer wg.Done()
 			status, msg := mod.Verify(ctx, w.client)
 			results[idx] = ModuleHealth{Module: mod, Status: status, Message: msg}
+			w.emit(Event{
+				Type:    "module_verified",
+				Module:  mod.Name(),
+				Message: msg,
+				Data: map[string]interface{}{
+					"status": status.String(),
+				},
+			})
 		}(i, m)
 	}
 	wg.Wait()
@@ -175,6 +213,11 @@ func (w *Walker) dispatch(ctx context.Context, node *graph.Node) {
 			defer cancel()
 
 			w.graph.IncrModulesRun()
+			w.emit(Event{
+				Type:   "module_started",
+				Module: mod.Name(),
+				NodeID: node.ID,
+			})
 
 			// Resolve seed type so modules see "username"/"email" etc.
 			// instead of "seed" in node.Type.
@@ -189,10 +232,17 @@ func (w *Walker) dispatch(ctx context.Context, node *graph.Node) {
 			if err != nil {
 				slog.Debug("module error", "module", mod.Name(), "node", node.ID, "err", err)
 				w.graph.IncrErrors()
+				w.emit(Event{
+					Type:    "module_error",
+					Module:  mod.Name(),
+					NodeID:  node.ID,
+					Message: err.Error(),
+				})
 				return
 			}
 
 			// Merge results into graph.
+			discoveredNodes := 0
 			for _, n := range nodes {
 				if isDegraded {
 					n.Confidence *= 0.5
@@ -200,6 +250,19 @@ func (w *Walker) dispatch(ctx context.Context, node *graph.Node) {
 				n.Wave = node.Wave + 1
 				if w.graph.AddNode(n) {
 					w.graph.IncrNodesFound()
+					discoveredNodes++
+					w.emit(Event{
+						Type:   "node_discovered",
+						Module: mod.Name(),
+						NodeID: n.ID,
+						Data: map[string]interface{}{
+							"node_type":   n.Type,
+							"label":       n.Label,
+							"confidence":  n.Confidence,
+							"wave":        n.Wave,
+							"source_node": node.ID,
+						},
+					})
 
 					// Pivot: dispatch new pivotable nodes within depth limit.
 					if n.Pivot && n.Wave <= w.maxDepth {
@@ -207,11 +270,33 @@ func (w *Walker) dispatch(ctx context.Context, node *graph.Node) {
 					}
 				}
 			}
+			discoveredEdges := 0
 			for _, e := range edges {
 				// Modules pass 0 as edge ID; walker assigns real IDs.
 				e.ID = fmt.Sprintf("e%d", w.graph.NextEdgeID())
 				w.graph.AddEdge(e)
+				discoveredEdges++
+				w.emit(Event{
+					Type:   "edge_discovered",
+					Module: mod.Name(),
+					EdgeID: e.ID,
+					NodeID: node.ID,
+					Data: map[string]interface{}{
+						"source": e.Source,
+						"target": e.Target,
+						"type":   e.Type,
+					},
+				})
 			}
+			w.emit(Event{
+				Type:   "module_finished",
+				Module: mod.Name(),
+				NodeID: node.ID,
+				Data: map[string]interface{}{
+					"nodes_discovered": discoveredNodes,
+					"edges_discovered": discoveredEdges,
+				},
+			})
 		}()
 	}
 }

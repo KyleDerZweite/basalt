@@ -86,8 +86,8 @@ func AccountNodeID(platform, seedValue string) string {
 
 // Seed represents a seed entity for scanning.
 type Seed struct {
-	Type  string
-	Value string
+	Type  string `json:"type"`
+	Value string `json:"value"`
 }
 
 // ParseSeed parses a seed string in format "type:value".

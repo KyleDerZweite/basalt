@@ -2,6 +2,10 @@
 
 Relational OSINT tool for discovering your digital footprint. Basalt runs 37 purpose-built modules against usernames, emails, and domains, then builds a relationship graph of everything it finds.
 
+Basalt also includes a **local product backend**: persisted scan history, local settings, a local HTTP API, and live scan events for local clients built on top of the Go engine.
+
+For interactive local use, Basalt can also serve a browser-based workspace directly from the Go binary with `basalt web`.
+
 Unlike tools that spray thousands of sites with URL templates, Basalt uses per-module logic with structured API calls, HTML scraping, and module-level health checks. Each module scores its own confidence. No false positives from generic status code matching.
 
 **For self-lookup and authorized research only.** You must have explicit consent before scanning any identifier you don't own.
@@ -36,6 +40,24 @@ basalt scan -u kyle --export json --export csv
 
 # Verbose mode (show module health details)
 basalt scan -u kyle -v
+
+# Run the local product API
+basalt serve
+
+# Run the local web workspace and open it in your browser
+basalt web
+
+# Run the web workspace without opening a browser
+basalt web --no-open
+
+# Run the local API in the background
+basalt serve --detach
+
+# Show managed API status
+basalt serve --status
+
+# Stop the managed API
+basalt serve --stop
 ```
 
 ### Flags
@@ -49,6 +71,7 @@ basalt scan -u kyle -v
 | `--concurrency` | `5` | Maximum concurrent module requests |
 | `--timeout` | `10` | Per-module timeout in seconds |
 | `--config` | `~/.basalt/config` | Path to config file for API keys |
+| `--data-dir` | `~/.basalt` | Path to local app data, scan history, and SQLite store |
 | `--export` | | Export format: `json`, `csv` (repeatable) |
 | `-v, --verbose` | `false` | Show module health details |
 
@@ -59,6 +82,63 @@ Terminal output is a color-coded table sorted by confidence score (green >= 0.80
 `--export json` writes the full graph (nodes, edges, metadata) to a timestamped JSON file.
 
 `--export csv` writes a flat node list to a timestamped CSV file.
+
+## Local Product API
+
+`basalt serve` starts a local HTTP API on `127.0.0.1:8787` by default. It persists:
+
+- scan history
+- scan event streams
+- local settings
+- exported graph results
+
+Current endpoints:
+
+- `GET /api/scans`
+- `POST /api/scans`
+- `GET /api/scans/{id}`
+- `GET /api/scans/{id}/results`
+- `GET /api/scans/{id}/events`
+- `GET /api/scans/{id}/export?format=json|csv`
+- `POST /api/scans/{id}/cancel`
+- `GET /api/modules/health`
+- `GET /api/settings`
+- `PUT /api/settings`
+
+All scan data is stored locally in `~/.basalt/basalt.db` unless `--data-dir` is overridden.
+
+For local clients and future UI layers, `serve` also supports:
+
+- `--listen 127.0.0.1:0` for an OS-assigned port
+- `--auth-token <token>` for bearer auth on every `/api/*` route
+- `--allow-origin <origin>` for strict CORS allowlists
+- `--detach` to run the API in the background
+- `--status` to inspect the managed API process
+- `--stop` to gracefully stop the managed API process
+- `--force` with `--stop` to hard-stop after timeout
+- `--log-file` to override the default log file path
+- `--print-listen-json` for machine-readable startup metadata
+
+See `docs/local-api.md` for the current local API contract.
+
+## Local Web Workspace
+
+`basalt web` starts a same-origin browser workspace on `127.0.0.1:8788` by default. It serves:
+
+- the local web UI at `/`
+- bootstrap runtime config at `/app/bootstrap`
+- the existing local API at `/api/*`
+
+Useful flags:
+
+- `--listen 127.0.0.1:0` for an OS-assigned port
+- `--open` to explicitly open the browser after startup
+- `--no-open` to keep the server running without launching a browser
+- `--data-dir` to point the workspace at a different local SQLite store
+
+The browser workspace is same-origin with the API, so it does not require CORS or bearer-token bootstrapping in normal use.
+
+See `docs/web-ui.md` for the current browser workspace behavior.
 
 ## Modules
 
