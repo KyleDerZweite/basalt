@@ -1,14 +1,14 @@
 # Basalt
 
-Relational OSINT tool for discovering your digital footprint. Basalt runs 37 purpose-built modules against usernames, emails, and domains, then builds a relationship graph of everything it finds.
+Basalt is a Go CLI for relational OSINT on identifiers you own or are explicitly authorized to investigate. It runs focused modules against usernames, emails, and domains, then builds a graph of accounts, links, infrastructure, and identity signals.
 
-Basalt also includes a **local product backend**: persisted scan history, local settings, a local HTTP API, and live scan events for local clients built on top of the Go engine.
+Basalt also includes:
 
-For interactive local use, Basalt can also serve a browser-based workspace directly from the Go binary with `basalt web`. The main workspace is now a **target-centric investigation map**: one real person can have many curated aliases, and the graph view is the primary surface while raw nodes and edges stay in secondary list tabs.
+- a local product API via `basalt serve`
+- a local browser workspace via `basalt web`
+- persistent targets and aliases for repeated investigations
 
-Unlike tools that spray thousands of sites with URL templates, Basalt uses per-module logic with structured API calls, HTML scraping, and module-level health checks. Each module scores its own confidence. No false positives from generic status code matching.
-
-**For self-lookup and authorized research only.** You must have explicit consent before scanning any identifier you don't own.
+Unlike spray-and-pray username checkers, Basalt uses per-module extraction logic, health checks, confidence scoring, and graph pivots.
 
 ## Install
 
@@ -18,174 +18,51 @@ cd basalt/cli
 go build -o basalt .
 ```
 
-The canonical repository is `https://github.com/KyleDerZweite/basalt`.
-
-## Usage
+## Quick Start
 
 ```bash
 # Scan a username
 basalt scan -u kylederzweite
 
-# Scan a stored target with multiple aliases
-basalt scan --target kyle
-
-# Scan an email
-basalt scan -e kyle@example.com
-
-# Scan a domain
-basalt scan -d kylehub.dev
-
-# Multiple seeds at once
+# Scan multiple seeds
 basalt scan -u kyle -e kyle@example.com -d kylehub.dev
 
 # Export results
 basalt scan -u kyle --export json --export csv
 
-# Verbose mode (show module health details)
-basalt scan -u kyle -v
-
-# Run the local product API
+# Run the local API
 basalt serve
 
-# Run the local web workspace and open it in your browser
+# Run the local browser workspace
 basalt web
 
-# Run the web workspace without opening a browser
-basalt web --no-open
-
-# Run the local API in the background
-basalt serve --detach
-
-# Show managed API status
-basalt serve --status
-
-# Stop the managed API
-basalt serve --stop
-
-# Create a persistent target and aliases
+# Create and reuse a stored target
 basalt target create kyle --name "Kyle"
-basalt target alias add kyle username:kylederzweite --primary --label "main handle"
-basalt target alias add kyle username:visplp
+basalt target alias add kyle username:kylederzweite --primary
+basalt scan --target kyle
 ```
 
-### Flags
+Use `basalt --help` or `basalt <command> --help` for the current CLI surface.
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `-u, --username` | | Username seed (repeatable) |
-| `-e, --email` | | Email seed (repeatable) |
-| `-d, --domain` | | Domain seed (repeatable) |
-| `--depth` | `2` | Maximum pivot depth |
-| `--concurrency` | `5` | Maximum concurrent module requests |
-| `--timeout` | `10` | Per-module timeout in seconds |
-| `--config` | `~/.basalt/config` | Path to config file for API keys |
-| `--target` | | Target slug or ID to scan using its stored aliases |
-| `--data-dir` | `~/.basalt` | Path to local app data, scan history, and SQLite store |
-| `--export` | | Export format: `json`, `csv` (repeatable) |
-| `-v, --verbose` | `false` | Show module health details |
+## Core Commands
 
-### Output
+- `basalt scan` runs an ad hoc scan from username, email, and domain seeds
+- `basalt target` manages persistent targets and curated aliases
+- `basalt serve` runs the local HTTP API for local clients and integrations
+- `basalt web` runs the built-in browser workspace on the same local backend
+- `basalt version` prints the current build version
 
-Terminal output is a color-coded table sorted by confidence score (green >= 0.80, yellow >= 0.50).
+## Docs
 
-`--export json` writes the full graph (nodes, edges, metadata) to a timestamped JSON file.
+- [Local API](docs/local-api.md)
+- [Web Workspace](docs/web-ui.md)
+- [Future Modules](docs/future-modules.md)
 
-`--export csv` writes a flat node list to a timestamped CSV file.
-
-## Targets And Aliases
-
-Basalt can persist a real person or subject as a **target** with multiple curated aliases:
-
-- `basalt target create <slug> --name "..."`
-- `basalt target list`
-- `basalt target show <slug>`
-- `basalt target alias add <slug> username:kylederzweite --primary`
-- `basalt target alias remove <slug> <alias-id>`
-- `basalt scan --target <slug>`
-
-This is the preferred way to scan multiple usernames that belong to the same person. For example, `kyle`, `kylederzweite`, `dj_kyle`, and `visplp` can all belong to one stored target.
-
-## Local Product API
-
-`basalt serve` starts a local HTTP API on `127.0.0.1:8787` by default. It persists:
-
-- scan history
-- scan event streams
-- local settings
-- exported graph results
-
-Current endpoints:
-
-- `GET /api/targets`
-- `POST /api/targets`
-- `GET /api/targets/{id|slug}`
-- `PATCH /api/targets/{id|slug}`
-- `DELETE /api/targets/{id|slug}`
-- `POST /api/targets/{id|slug}/aliases`
-- `DELETE /api/targets/{id|slug}/aliases/{aliasId}`
-- `GET /api/targets/{id|slug}/scans`
-- `GET /api/scans`
-- `POST /api/scans`
-- `GET /api/scans/{id}`
-- `GET /api/scans/{id}/results`
-- `GET /api/scans/{id}/workspace`
-- `GET /api/scans/{id}/events`
-- `GET /api/scans/{id}/export?format=json|csv`
-- `POST /api/scans/{id}/cancel`
-- `GET /api/modules/health`
-- `GET /api/settings`
-- `PUT /api/settings`
-
-All scan data is stored locally in `~/.basalt/basalt.db` unless `--data-dir` is overridden.
-
-For local clients and future UI layers, `serve` also supports:
-
-- `--listen 127.0.0.1:0` for an OS-assigned port
-- `--auth-token <token>` for bearer auth on every `/api/*` route
-- `--allow-origin <origin>` for strict CORS allowlists
-- `--detach` to run the API in the background
-- `--status` to inspect the managed API process
-- `--stop` to gracefully stop the managed API process
-- `--force` with `--stop` to hard-stop after timeout
-- `--log-file` to override the default log file path
-- `--print-listen-json` for machine-readable startup metadata
-
-See `docs/local-api.md` for the current local API contract.
-
-## Local Web Workspace
-
-`basalt web` starts a same-origin browser workspace on `127.0.0.1:8788` by default. It serves:
-
-- the local web UI at `/`
-- bootstrap runtime config at `/app/bootstrap`
-- the existing local API at `/api/*`
-
-Useful flags:
-
-- `--listen 127.0.0.1:0` for an OS-assigned port
-- `--open` to explicitly open the browser after startup
-- `--no-open` to keep the server running without launching a browser
-- `--data-dir` to point the workspace at a different local SQLite store
-
-The browser workspace is same-origin with the API, so it does not require CORS or bearer-token bootstrapping in normal use.
-
-The main scan view is a mindmap-style graph synthesized from the raw scan evidence:
-
-- root target or scan node
-- curated alias branch
-- accounts branch
-- identity signals branch
-- websites/domains branch
-- infrastructure branch
-- warnings branch
-
-The raw node and edge tables are still available, but they are no longer the main view.
-
-See `docs/web-ui.md` for the current browser workspace behavior.
+The README intentionally stays high level. API endpoints, workspace behavior, and backlog details live in `docs/`.
 
 ## Modules
 
-37 modules across 9 categories:
+Basalt currently ships with 38 modules.
 
 | Category | Modules | Seed Types |
 |----------|---------|------------|
@@ -196,49 +73,44 @@ See `docs/web-ui.md` for the current browser workspace behavior.
 | Comms | Matrix | username |
 | Gaming | Steam, OP.GG, Spotify, Chess.com, Lichess, MyAnimeList, Roblox | username |
 | Productivity | Trello | username |
-| Domain | WHOIS/RDAP, DNS/CT | domain |
+| Domain | WHOIS/RDAP, DNS/CT, Security.txt | domain |
 | Infrastructure | Shodan, Wayback Machine, IPinfo | domain |
 
 Modules self-report health before scanning:
-- **Healthy**: normal operation
-- **Degraded**: works but confidence is halved (rate limits, intermittent issues)
-- **Offline**: skipped entirely (API down, missing key)
 
-## How It Works
-
-Basalt uses a **reactive graph walker**. There are no tiers or waves. Execution order emerges from data flow:
-
-1. Seed nodes are added to the graph
-2. All modules that can handle each seed type are dispatched concurrently
-3. When a module returns new nodes (emails, usernames, domains), those are fed back into the walker
-4. This continues until pivot depth is reached or no new pivotable nodes are found
-
-Each module independently decides what to extract and what confidence to assign. The walker handles deduplication, concurrency limiting, and depth tracking.
-
-On top of the raw evidence graph, Basalt also derives:
-
-- target-centric alias groupings
-- scan insights and top findings
-- a synthesized workspace graph for the browser UI
+- `healthy`: normal operation
+- `degraded`: works, but confidence is reduced
+- `offline`: skipped
 
 ## Configuration
 
-API keys go in `~/.basalt/config` (or pass `--config path`):
+Config lives in `~/.basalt/config` by default and uses `KEY=VALUE` lines:
 
-```
+```bash
 GITHUB_TOKEN=ghp_xxxxxxxxxxxx
 ```
 
-GitHub works without a token but has lower rate limits. All other modules work without API keys.
+GitHub works without a token but has lower rate limits. Other current modules work without API keys.
+
+Local runtime data is stored in `~/.basalt` by default unless `--data-dir` is overridden.
+
+## Development
+
+```bash
+cd cli
+go build ./...
+go vet ./...
+go test ./...
+```
 
 ## Legal
 
-This tool queries only publicly accessible endpoints. No authentication bypass, no private data access.
+For self-lookup and authorized research only.
 
-- GDPR: only scan identifiers you own or have explicit consent to search
-- Rate limiting is built in and enforced per-domain
-- Proxy support is for privacy, not evasion
+- Only scan identifiers you own or have explicit consent to investigate
+- Do not use Basalt to target third parties without authorization
+- Public availability of an endpoint does not remove legal or ethical obligations
 
 ## License
 
-[AGPLv3](LICENSE): if you use Basalt in a network service, you must share your source code.
+[AGPLv3](LICENSE)
