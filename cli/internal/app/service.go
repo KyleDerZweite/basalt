@@ -66,6 +66,11 @@ func (s *Service) Version() string {
 	return s.version
 }
 
+// Store exposes the local store for package-internal integrations and tests.
+func (s *Service) Store() *Store {
+	return s.store
+}
+
 // GetSettings returns local product settings.
 func (s *Service) GetSettings() (Settings, error) {
 	return s.store.GetSettings()
@@ -119,12 +124,30 @@ func (s *Service) CancelScan(id string) error {
 
 // ListScans returns recent persisted scans.
 func (s *Service) ListScans(limit int) ([]*ScanRecord, error) {
-	return s.store.ListScans(limit)
+	scans, err := s.store.ListScans(limit)
+	if err != nil {
+		return nil, err
+	}
+	for _, scan := range scans {
+		if scan.Insights == nil && scan.Graph != nil {
+			insights := BuildScanInsights(scan.Graph, scan.Health, scan.Status)
+			scan.Insights = &insights
+		}
+	}
+	return scans, nil
 }
 
 // GetScan returns a persisted scan by ID.
 func (s *Service) GetScan(id string) (*ScanRecord, error) {
-	return s.store.GetScan(id)
+	record, err := s.store.GetScan(id)
+	if err != nil {
+		return nil, err
+	}
+	if record.Insights == nil && record.Graph != nil {
+		insights := BuildScanInsights(record.Graph, record.Health, record.Status)
+		record.Insights = &insights
+	}
+	return record, nil
 }
 
 // GetEvents returns persisted scan events after a given sequence number.
@@ -186,6 +209,11 @@ func (s *Service) ModuleHealth(ctx context.Context, req ScanRequest) ([]ModuleSt
 
 func (s *Service) prepareScan(req ScanRequest) (*ScanRecord, Settings, error) {
 	req.Normalize()
+	targetID, targetSeeds, err := s.resolveTargetSeeds(req.TargetRef)
+	if err != nil {
+		return nil, Settings{}, err
+	}
+	req.Seeds = dedupeSeeds(append(targetSeeds, req.Seeds...))
 	if len(req.Seeds) == 0 {
 		return nil, Settings{}, fmt.Errorf("at least one seed is required")
 	}
@@ -198,6 +226,7 @@ func (s *Service) prepareScan(req ScanRequest) (*ScanRecord, Settings, error) {
 	now := time.Now().UTC()
 	record := &ScanRecord{
 		ID:        uuid.New().String(),
+		TargetID:  targetID,
 		Status:    ScanStatusQueued,
 		StartedAt: now,
 		UpdatedAt: now,
@@ -324,6 +353,8 @@ func (s *Service) executeScan(ctx context.Context, record *ScanRecord, settings 
 	default:
 		record.Status = ScanStatusCompleted
 	}
+	insights := BuildScanInsights(graphData, record.Health, record.Status)
+	record.Insights = &insights
 
 	if err := s.store.UpdateScan(record); err != nil {
 		s.failScan(record, err)

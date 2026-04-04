@@ -8,8 +8,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/KyleDerZweite/basalt/internal/app"
+	"github.com/KyleDerZweite/basalt/internal/graph"
 )
 
 func TestSettingsRoundTrip(t *testing.T) {
@@ -120,7 +122,99 @@ func TestServerRejectsForbiddenOriginPreflight(t *testing.T) {
 	}
 }
 
+func TestTargetsRoundTrip(t *testing.T) {
+	handler := testServer(t, Options{})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/targets", bytes.NewReader([]byte(`{"display_name":"Kyle","slug":"kyle"}`)))
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("POST /api/targets returned %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var target app.Target
+	if err := json.Unmarshal(rec.Body.Bytes(), &target); err != nil {
+		t.Fatal(err)
+	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/targets/kyle/aliases", bytes.NewReader([]byte(`{"seed_type":"username","seed_value":"kylederzweite","is_primary":true}`)))
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("POST /api/targets/{id}/aliases returned %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/targets/kyle", nil)
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/targets/{id} returned %d: %s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Body.String(); !bytes.Contains([]byte(got), []byte(`"kylederzweite"`)) {
+		t.Fatalf("expected alias in target payload, got %s", got)
+	}
+}
+
+func TestWorkspaceEndpoint(t *testing.T) {
+	harness := testHarness(t, Options{})
+	now := time.Now().UTC().Round(time.Second)
+	target, err := harness.service.CreateTarget(app.Target{
+		DisplayName: "Kyle",
+		Slug:        "kyle",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := harness.service.AddTargetAlias(target.Slug, graph.Seed{Type: graph.NodeTypeUsername, Value: "kylederzweite"}, "", true); err != nil {
+		t.Fatal(err)
+	}
+
+	g := graph.New()
+	account := graph.NewAccountNode("github", "KyleDerZweite", "https://github.com/KyleDerZweite", "github")
+	account.Confidence = 0.95
+	account.Properties["site_name"] = "github"
+	domain := graph.NewNode(graph.NodeTypeDomain, "kylehub.dev", "github")
+	domain.Confidence = 0.85
+	if !g.AddNode(account) || !g.AddNode(domain) {
+		t.Fatal("expected graph nodes")
+	}
+	record := &app.ScanRecord{
+		ID:        "scan-1",
+		TargetID:  target.ID,
+		Status:    app.ScanStatusCompleted,
+		StartedAt: now,
+		UpdatedAt: now,
+		Seeds:     []graph.Seed{{Type: graph.NodeTypeUsername, Value: "kylederzweite"}},
+		Options:   app.ScanRequest{TargetRef: target.Slug},
+		Health:    []app.ModuleStatus{{Name: "github", Status: "healthy", Message: "ok"}},
+		Graph:     g,
+	}
+	record.Insights = ptr(app.BuildScanInsights(g, record.Health, record.Status))
+	if err := harness.RunStoreCreateAndUpdate(record); err != nil {
+		t.Fatal(err)
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/scans/scan-1/workspace", nil)
+	harness.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/scans/{id}/workspace returned %d: %s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Body.String(); !bytes.Contains([]byte(got), []byte(`"headline"`)) || !bytes.Contains([]byte(got), []byte(`"target"`)) {
+		t.Fatalf("expected workspace payload, got %s", got)
+	}
+}
+
 func testServer(t *testing.T, opts Options) http.Handler {
+	return testHarness(t, opts).handler
+}
+
+type harness struct {
+	handler http.Handler
+	service *app.Service
+}
+
+func testHarness(t *testing.T, opts Options) harness {
 	t.Helper()
 
 	service, err := app.NewService("test", t.TempDir())
@@ -131,5 +225,19 @@ func testServer(t *testing.T, opts Options) http.Handler {
 		_ = service.Close()
 	})
 
-	return NewServer(service, opts)
+	return harness{
+		handler: NewServer(service, opts),
+		service: service,
+	}
+}
+
+func (h harness) RunStoreCreateAndUpdate(record *app.ScanRecord) error {
+	if err := h.service.Store().CreateScan(record); err != nil {
+		return err
+	}
+	return h.service.Store().UpdateScan(record)
+}
+
+func ptr[T any](value T) *T {
+	return &value
 }

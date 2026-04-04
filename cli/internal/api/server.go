@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/KyleDerZweite/basalt/internal/app"
+	"github.com/KyleDerZweite/basalt/internal/graph"
 )
 
 // Options configures the local HTTP API.
@@ -33,6 +34,8 @@ func NewServer(service *app.Service, opts Options) http.Handler {
 	mux.HandleFunc("/", server.handleRoot)
 	mux.Handle("/api/settings", server.apiHandler(http.HandlerFunc(server.handleSettings)))
 	mux.Handle("/api/modules/health", server.apiHandler(http.HandlerFunc(server.handleModuleHealth)))
+	mux.Handle("/api/targets", server.apiHandler(http.HandlerFunc(server.handleTargets)))
+	mux.Handle("/api/targets/", server.apiHandler(http.HandlerFunc(server.handleTargetByID)))
 	mux.Handle("/api/scans", server.apiHandler(http.HandlerFunc(server.handleScans)))
 	mux.Handle("/api/scans/", server.apiHandler(http.HandlerFunc(server.handleScanByID)))
 	return mux
@@ -130,6 +133,125 @@ func (s *Server) handleScans(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *Server) handleTargets(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		targets, err := s.service.ListTargets()
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"targets": targets})
+	case http.MethodPost:
+		var target app.Target
+		if err := json.NewDecoder(r.Body).Decode(&target); err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Errorf("invalid target payload: %w", err))
+			return
+		}
+		created, err := s.service.CreateTarget(target)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, created)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) handleTargetByID(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/targets/")
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) == 0 || parts[0] == "" {
+		http.NotFound(w, r)
+		return
+	}
+
+	ref := parts[0]
+	if len(parts) == 1 {
+		switch r.Method {
+		case http.MethodGet:
+			target, err := s.service.GetTarget(ref)
+			if err != nil {
+				writeError(w, http.StatusNotFound, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, target)
+		case http.MethodPatch:
+			var target app.Target
+			if err := json.NewDecoder(r.Body).Decode(&target); err != nil {
+				writeError(w, http.StatusBadRequest, fmt.Errorf("invalid target payload: %w", err))
+				return
+			}
+			updated, err := s.service.UpdateTarget(ref, target)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, updated)
+		case http.MethodDelete:
+			if err := s.service.DeleteTarget(ref); err != nil {
+				writeError(w, http.StatusNotFound, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"deleted": true})
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+		return
+	}
+
+	switch parts[1] {
+	case "aliases":
+		if len(parts) == 2 {
+			if r.Method != http.MethodPost {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			var payload struct {
+				SeedType  string `json:"seed_type"`
+				SeedValue string `json:"seed_value"`
+				Label     string `json:"label"`
+				IsPrimary bool   `json:"is_primary"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				writeError(w, http.StatusBadRequest, fmt.Errorf("invalid alias payload: %w", err))
+				return
+			}
+			alias, err := s.service.AddTargetAlias(ref, appSeed(payload.SeedType, payload.SeedValue), payload.Label, payload.IsPrimary)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, err)
+				return
+			}
+			writeJSON(w, http.StatusCreated, alias)
+			return
+		}
+		if r.Method != http.MethodDelete {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if err := s.service.RemoveTargetAlias(ref, parts[2]); err != nil {
+			writeError(w, http.StatusNotFound, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"deleted": true})
+	case "scans":
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		limit := parseInt(r.URL.Query().Get("limit"), 20)
+		scans, err := s.service.ListTargetScans(ref, limit)
+		if err != nil {
+			writeError(w, http.StatusNotFound, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"scans": scans})
+	default:
+		http.NotFound(w, r)
+	}
+}
+
 func (s *Server) handleScanByID(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/api/scans/")
 	parts := strings.Split(strings.Trim(path, "/"), "/")
@@ -169,6 +291,17 @@ func (s *Server) handleScanByID(w http.ResponseWriter, r *http.Request) {
 			"graph":   record.Graph,
 			"status":  record.Status,
 		})
+	case "workspace":
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		workspace, err := s.service.BuildWorkspace(scanID)
+		if err != nil {
+			writeError(w, http.StatusNotFound, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, workspace)
 	case "events":
 		if acceptsSSE(r) {
 			s.streamEvents(w, r, scanID)
@@ -222,6 +355,10 @@ func (s *Server) handleScanByID(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+func appSeed(seedType, seedValue string) graph.Seed {
+	return graph.Seed{Type: strings.TrimSpace(seedType), Value: strings.TrimSpace(seedValue)}
 }
 
 func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request, scanID string) {

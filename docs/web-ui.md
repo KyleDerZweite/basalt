@@ -40,20 +40,26 @@ Current browser functionality focuses on operations rather than styling:
 
 - Home:
   - recent scans
+  - target list
   - module health summary
   - runtime summary
   - settings summary
+- Targets:
+  - create persistent targets
+  - add and remove aliases
+  - review curated identifiers before scanning
 - New Scan:
+  - choose a target or run ad hoc
   - add/remove username, email, and domain seeds
   - set depth, concurrency, timeout
   - toggle strict mode
   - disable modules by name
 - Scan Workspace:
-  - live scan status
-  - persisted node and edge tables
+  - top summary cards and findings
+  - target-centric mindmap graph as the primary view
+  - persisted node and edge tables as secondary views
   - live event timeline over SSE
-  - module health table
-  - evidence/details panel for selected nodes and edges
+  - evidence/details panel for selected synthesized graph nodes
   - cancel running scan
   - JSON and CSV export actions
 - Settings:
@@ -82,4 +88,6 @@ Current browser functionality focuses on operations rather than styling:
 
 - The web workspace is a thin local client. Scans, persistence, events, and exports still come from the Go backend.
 - Scan history and settings remain in the same SQLite database used by `basalt serve` and `basalt scan`.
+- Targets and aliases are persisted locally and can be reused across scans.
+- The graph shown in the UI is synthesized from the raw evidence graph so the main view stays readable and target-centric.
 - `basalt serve` remains the headless integration path for custom clients.

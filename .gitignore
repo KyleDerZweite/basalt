@@ -21,3 +21,5 @@ vendor/
 .codex
 
 *basalt-scan*.json
+
+web/node_modules/

@@ -92,6 +92,7 @@ Query parameters:
 - `POST /api/scans`
 - `GET /api/scans/{id}`
 - `GET /api/scans/{id}/results`
+- `GET /api/scans/{id}/workspace`
 - `GET /api/scans/{id}/events`
 - `GET /api/scans/{id}/events?stream=1`
 - `GET /api/scans/{id}/export?format=json|csv`
@@ -109,7 +110,40 @@ Create payload:
   "concurrency": 5,
   "timeout_seconds": 10,
   "strict_mode": false,
-  "disabled_modules": []
+  "disabled_modules": [],
+  "target_ref": "kyle"
+}
+```
+
+### Targets
+
+- `GET /api/targets`
+- `POST /api/targets`
+- `GET /api/targets/{id|slug}`
+- `PATCH /api/targets/{id|slug}`
+- `DELETE /api/targets/{id|slug}`
+- `POST /api/targets/{id|slug}/aliases`
+- `DELETE /api/targets/{id|slug}/aliases/{aliasId}`
+- `GET /api/targets/{id|slug}/scans`
+
+Target payload example:
+
+```json
+{
+  "display_name": "Kyle",
+  "slug": "kyle",
+  "notes": "Main OSINT subject"
+}
+```
+
+Alias payload example:
+
+```json
+{
+  "seed_type": "username",
+  "seed_value": "kylederzweite",
+  "label": "main handle",
+  "is_primary": true
 }
 ```
 
@@ -138,7 +172,7 @@ Current event types:
 All local data is stored in `~/.basalt` by default:
 
 - `~/.basalt/config` for API keys
-- `~/.basalt/basalt.db` for scans, settings, and events
+- `~/.basalt/basalt.db` for scans, settings, events, targets, aliases, and scan insights
 
 ## Client Notes
 
@@ -147,3 +181,4 @@ All local data is stored in `~/.basalt` by default:
 - Local clients should use `--listen 127.0.0.1:0` rather than hard-coding a port.
 - Managed background mode is per `--data-dir`, so separate data dirs can run separate local APIs.
 - `basalt web` is the recommended built-in browser client and uses the same API contract without requiring cross-origin requests.
+- `GET /api/scans/{id}/workspace` is the preferred browser endpoint for the investigation graph and top-level scan summary.

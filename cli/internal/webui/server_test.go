@@ -24,7 +24,7 @@ func TestRootServesIndex(t *testing.T) {
 	if got := rec.Header().Get("Content-Type"); !strings.Contains(got, "text/html") {
 		t.Fatalf("expected HTML content type, got %q", got)
 	}
-	if !strings.Contains(rec.Body.String(), "<!DOCTYPE html>") {
+	if !strings.Contains(rec.Body.String(), "<div id=\"root\"></div>") {
 		t.Fatalf("expected HTML shell, got %s", rec.Body.String())
 	}
 }
@@ -79,7 +79,7 @@ func TestPathFallbackServesIndex(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("GET /scans/example-scan returned %d: %s", rec.Code, rec.Body.String())
 	}
-	if !strings.Contains(rec.Body.String(), "<!DOCTYPE html>") {
+	if !strings.Contains(rec.Body.String(), "<div id=\"root\"></div>") {
 		t.Fatalf("expected HTML shell, got %s", rec.Body.String())
 	}
 }
@@ -93,7 +93,7 @@ func TestAssetsAreServed(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("GET /assets/app.js returned %d: %s", rec.Code, rec.Body.String())
 	}
-	if !strings.Contains(rec.Body.String(), "const state =") {
+	if !strings.Contains(rec.Body.String(), "reactflow") && !strings.Contains(rec.Body.String(), "Investigation Workspace") {
 		t.Fatalf("expected JavaScript asset, got %s", rec.Body.String())
 	}
 }

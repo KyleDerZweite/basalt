@@ -24,6 +24,7 @@ var (
 	flagConcurrency int
 	flagTimeout     int
 	flagConfigPath  string
+	flagTargetRef   string
 	flagDataDir     string
 	flagExport      []string
 	flagVerbose     bool
@@ -38,7 +39,8 @@ Examples:
   basalt scan -u kylederzweite
   basalt scan -e kyle@example.com
   basalt scan -d kylehub.dev
-  basalt scan -u kyle -e kyle@example.com`,
+  basalt scan -u kyle -e kyle@example.com
+  basalt scan --target kyle`,
 	RunE: runScan,
 }
 
@@ -52,6 +54,7 @@ func init() {
 	scanCmd.Flags().IntVar(&flagConcurrency, "concurrency", 5, "Maximum concurrent requests")
 	scanCmd.Flags().IntVar(&flagTimeout, "timeout", 10, "Per-module timeout in seconds")
 	scanCmd.Flags().StringVar(&flagConfigPath, "config", "", "Path to config file for API keys")
+	scanCmd.Flags().StringVar(&flagTargetRef, "target", "", "Target slug or ID to scan using its stored aliases")
 	scanCmd.Flags().StringVar(&flagDataDir, "data-dir", app.DefaultDataDir(), "Path to local app data directory")
 	scanCmd.Flags().StringSliceVar(&flagExport, "export", nil, "Export format: json, csv")
 	scanCmd.Flags().BoolVarP(&flagVerbose, "verbose", "v", false, "Show module health and debug info")
@@ -64,9 +67,10 @@ func runScan(cmd *cobra.Command, args []string) error {
 		Concurrency:    flagConcurrency,
 		TimeoutSeconds: flagTimeout,
 		ConfigPath:     flagConfigPath,
+		TargetRef:      flagTargetRef,
 	}
-	if len(request.Seeds) == 0 {
-		return fmt.Errorf("at least one seed required (-u, -e, or -d)")
+	if len(request.Seeds) == 0 && request.TargetRef == "" {
+		return fmt.Errorf("at least one seed required (-u, -e, or -d), or use --target")
 	}
 
 	service, err := app.NewService(Version, flagDataDir)

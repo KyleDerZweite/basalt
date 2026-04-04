@@ -4,7 +4,7 @@ Relational OSINT tool for discovering your digital footprint. Basalt runs 37 pur
 
 Basalt also includes a **local product backend**: persisted scan history, local settings, a local HTTP API, and live scan events for local clients built on top of the Go engine.
 
-For interactive local use, Basalt can also serve a browser-based workspace directly from the Go binary with `basalt web`.
+For interactive local use, Basalt can also serve a browser-based workspace directly from the Go binary with `basalt web`. The main workspace is now a **target-centric investigation map**: one real person can have many curated aliases, and the graph view is the primary surface while raw nodes and edges stay in secondary list tabs.
 
 Unlike tools that spray thousands of sites with URL templates, Basalt uses per-module logic with structured API calls, HTML scraping, and module-level health checks. Each module scores its own confidence. No false positives from generic status code matching.
 
@@ -25,6 +25,9 @@ The canonical repository is `https://github.com/KyleDerZweite/basalt`.
 ```bash
 # Scan a username
 basalt scan -u kylederzweite
+
+# Scan a stored target with multiple aliases
+basalt scan --target kyle
 
 # Scan an email
 basalt scan -e kyle@example.com
@@ -58,6 +61,11 @@ basalt serve --status
 
 # Stop the managed API
 basalt serve --stop
+
+# Create a persistent target and aliases
+basalt target create kyle --name "Kyle"
+basalt target alias add kyle username:kylederzweite --primary --label "main handle"
+basalt target alias add kyle username:visplp
 ```
 
 ### Flags
@@ -71,6 +79,7 @@ basalt serve --stop
 | `--concurrency` | `5` | Maximum concurrent module requests |
 | `--timeout` | `10` | Per-module timeout in seconds |
 | `--config` | `~/.basalt/config` | Path to config file for API keys |
+| `--target` | | Target slug or ID to scan using its stored aliases |
 | `--data-dir` | `~/.basalt` | Path to local app data, scan history, and SQLite store |
 | `--export` | | Export format: `json`, `csv` (repeatable) |
 | `-v, --verbose` | `false` | Show module health details |
@@ -83,6 +92,19 @@ Terminal output is a color-coded table sorted by confidence score (green >= 0.80
 
 `--export csv` writes a flat node list to a timestamped CSV file.
 
+## Targets And Aliases
+
+Basalt can persist a real person or subject as a **target** with multiple curated aliases:
+
+- `basalt target create <slug> --name "..."`
+- `basalt target list`
+- `basalt target show <slug>`
+- `basalt target alias add <slug> username:kylederzweite --primary`
+- `basalt target alias remove <slug> <alias-id>`
+- `basalt scan --target <slug>`
+
+This is the preferred way to scan multiple usernames that belong to the same person. For example, `kyle`, `kylederzweite`, `dj_kyle`, and `visplp` can all belong to one stored target.
+
 ## Local Product API
 
 `basalt serve` starts a local HTTP API on `127.0.0.1:8787` by default. It persists:
@@ -94,10 +116,19 @@ Terminal output is a color-coded table sorted by confidence score (green >= 0.80
 
 Current endpoints:
 
+- `GET /api/targets`
+- `POST /api/targets`
+- `GET /api/targets/{id|slug}`
+- `PATCH /api/targets/{id|slug}`
+- `DELETE /api/targets/{id|slug}`
+- `POST /api/targets/{id|slug}/aliases`
+- `DELETE /api/targets/{id|slug}/aliases/{aliasId}`
+- `GET /api/targets/{id|slug}/scans`
 - `GET /api/scans`
 - `POST /api/scans`
 - `GET /api/scans/{id}`
 - `GET /api/scans/{id}/results`
+- `GET /api/scans/{id}/workspace`
 - `GET /api/scans/{id}/events`
 - `GET /api/scans/{id}/export?format=json|csv`
 - `POST /api/scans/{id}/cancel`
@@ -138,6 +169,18 @@ Useful flags:
 
 The browser workspace is same-origin with the API, so it does not require CORS or bearer-token bootstrapping in normal use.
 
+The main scan view is a mindmap-style graph synthesized from the raw scan evidence:
+
+- root target or scan node
+- curated alias branch
+- accounts branch
+- identity signals branch
+- websites/domains branch
+- infrastructure branch
+- warnings branch
+
+The raw node and edge tables are still available, but they are no longer the main view.
+
 See `docs/web-ui.md` for the current browser workspace behavior.
 
 ## Modules
@@ -171,6 +214,12 @@ Basalt uses a **reactive graph walker**. There are no tiers or waves. Execution 
 4. This continues until pivot depth is reached or no new pivotable nodes are found
 
 Each module independently decides what to extract and what confidence to assign. The walker handles deduplication, concurrency limiting, and depth tracking.
+
+On top of the raw evidence graph, Basalt also derives:
+
+- target-centric alias groupings
+- scan insights and top findings
+- a synthesized workspace graph for the browser UI
 
 ## Configuration
 

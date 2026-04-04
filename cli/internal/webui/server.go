@@ -7,15 +7,14 @@ import (
 	"encoding/json"
 	"io/fs"
 	"net/http"
-	"path"
 	"strings"
 
 	"github.com/KyleDerZweite/basalt/internal/api"
 	"github.com/KyleDerZweite/basalt/internal/app"
 )
 
-//go:embed static/*
-var staticFS embed.FS
+//go:embed dist dist/* dist/assets/*
+var distFS embed.FS
 
 // Options configures the browser-facing local product server.
 type Options struct {
@@ -24,14 +23,13 @@ type Options struct {
 
 // NewServer creates the same-origin web UI and API server.
 func NewServer(service *app.Service, opts Options) http.Handler {
-	sub, err := fs.Sub(staticFS, "static")
+	sub, err := fs.Sub(distFS, "dist")
 	if err != nil {
 		panic(err)
 	}
 
 	apiHandler := api.NewServer(service, api.Options{})
 	fileServer := http.FileServer(http.FS(sub))
-	assetsHandler := http.StripPrefix("/assets/", fileServer)
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", apiHandler)
@@ -50,10 +48,9 @@ func NewServer(service *app.Service, opts Options) http.Handler {
 			"base_url":            opts.BaseURL,
 		})
 	}))
-	mux.Handle("/assets/", assetsHandler)
-	mux.Handle("/favicon.ico", fileServer)
+	mux.Handle("/assets/", fileServer)
 	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if shouldServeAsset(r.URL.Path) {
+		if shouldServeAsset(sub, r.URL.Path) {
 			fileServer.ServeHTTP(w, r)
 			return
 		}
@@ -64,18 +61,19 @@ func NewServer(service *app.Service, opts Options) http.Handler {
 	return mux
 }
 
-func shouldServeAsset(requestPath string) bool {
-	if requestPath == "/" {
+func shouldServeAsset(fsys fs.FS, requestPath string) bool {
+	if requestPath == "/" || strings.HasPrefix(requestPath, "/api/") || requestPath == "/app/bootstrap" {
 		return false
 	}
-	if strings.HasPrefix(requestPath, "/api/") || requestPath == "/app/bootstrap" {
+	trimmed := strings.TrimPrefix(strings.TrimSpace(requestPath), "/")
+	if trimmed == "" {
 		return false
 	}
-	if strings.HasPrefix(requestPath, "/assets/") || requestPath == "/favicon.ico" {
-		return true
+	info, err := fs.Stat(fsys, trimmed)
+	if err != nil {
+		return false
 	}
-	ext := path.Ext(requestPath)
-	return ext != ""
+	return !info.IsDir()
 }
 
 func serveIndex(fsys fs.FS, w http.ResponseWriter) error {

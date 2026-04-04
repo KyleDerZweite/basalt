@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -52,6 +53,7 @@ func (s *Store) migrate() error {
 		`PRAGMA journal_mode = WAL;`,
 		`CREATE TABLE IF NOT EXISTS scans (
 			id TEXT PRIMARY KEY,
+			target_id TEXT NOT NULL DEFAULT '',
 			status TEXT NOT NULL,
 			started_at TEXT NOT NULL,
 			completed_at TEXT,
@@ -59,6 +61,7 @@ func (s *Store) migrate() error {
 			seeds_json TEXT NOT NULL,
 			options_json TEXT NOT NULL,
 			health_json TEXT NOT NULL,
+			insights_json TEXT,
 			graph_json TEXT,
 			node_count INTEGER NOT NULL DEFAULT 0,
 			edge_count INTEGER NOT NULL DEFAULT 0,
@@ -83,12 +86,43 @@ func (s *Store) migrate() error {
 			data_json TEXT NOT NULL,
 			updated_at TEXT NOT NULL
 		);`,
+		`CREATE TABLE IF NOT EXISTS targets (
+			id TEXT PRIMARY KEY,
+			slug TEXT NOT NULL UNIQUE,
+			display_name TEXT NOT NULL,
+			notes TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
+		);`,
+		`CREATE TABLE IF NOT EXISTS target_aliases (
+			id TEXT PRIMARY KEY,
+			target_id TEXT NOT NULL,
+			seed_type TEXT NOT NULL,
+			seed_value TEXT NOT NULL,
+			label TEXT NOT NULL DEFAULT '',
+			is_primary INTEGER NOT NULL DEFAULT 0,
+			created_at TEXT NOT NULL,
+			FOREIGN KEY (target_id) REFERENCES targets(id) ON DELETE CASCADE,
+			UNIQUE (target_id, seed_type, seed_value)
+		);`,
+		`CREATE INDEX IF NOT EXISTS idx_target_aliases_target ON target_aliases(target_id);`,
 	}
 
 	for _, statement := range statements {
 		if _, err := s.db.Exec(statement); err != nil {
 			return fmt.Errorf("migrating database: %w", err)
 		}
+	}
+	for _, statement := range []string{
+		`ALTER TABLE scans ADD COLUMN target_id TEXT NOT NULL DEFAULT '';`,
+		`ALTER TABLE scans ADD COLUMN insights_json TEXT;`,
+	} {
+		if _, err := s.db.Exec(statement); err != nil && !strings.Contains(err.Error(), "duplicate column name") {
+			return fmt.Errorf("migrating database: %w", err)
+		}
+	}
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_scans_target_id ON scans(target_id);`); err != nil {
+		return fmt.Errorf("migrating database: %w", err)
 	}
 	return nil
 }
@@ -143,14 +177,23 @@ func (s *Store) CreateScan(record *ScanRecord) error {
 	if err != nil {
 		return fmt.Errorf("encoding module health: %w", err)
 	}
+	var insightsJSON any
+	if record.Insights != nil {
+		payload, err := json.Marshal(record.Insights)
+		if err != nil {
+			return fmt.Errorf("encoding scan insights: %w", err)
+		}
+		insightsJSON = string(payload)
+	}
 
 	_, err = s.db.Exec(`
 		INSERT INTO scans (
-			id, status, started_at, completed_at, updated_at, seeds_json, options_json,
-			health_json, graph_json, node_count, edge_count, error_message
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			id, target_id, status, started_at, completed_at, updated_at, seeds_json, options_json,
+			health_json, insights_json, graph_json, node_count, edge_count, error_message
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		record.ID,
+		record.TargetID,
 		string(record.Status),
 		record.StartedAt.UTC().Format(time.RFC3339Nano),
 		timeString(record.CompletedAt),
@@ -158,6 +201,7 @@ func (s *Store) CreateScan(record *ScanRecord) error {
 		string(seedsJSON),
 		string(optionsJSON),
 		string(healthJSON),
+		insightsJSON,
 		nil,
 		record.NodeCount,
 		record.EdgeCount,
@@ -182,6 +226,14 @@ func (s *Store) UpdateScan(record *ScanRecord) error {
 	if err != nil {
 		return fmt.Errorf("encoding module health: %w", err)
 	}
+	var insightsJSON any
+	if record.Insights != nil {
+		payload, err := json.Marshal(record.Insights)
+		if err != nil {
+			return fmt.Errorf("encoding scan insights: %w", err)
+		}
+		insightsJSON = string(payload)
+	}
 
 	var graphJSON any
 	if record.Graph != nil {
@@ -197,16 +249,18 @@ func (s *Store) UpdateScan(record *ScanRecord) error {
 
 	_, err = s.db.Exec(`
 		UPDATE scans
-		SET status = ?, completed_at = ?, updated_at = ?, seeds_json = ?, options_json = ?,
-		    health_json = ?, graph_json = ?, node_count = ?, edge_count = ?, error_message = ?
+		SET target_id = ?, status = ?, completed_at = ?, updated_at = ?, seeds_json = ?, options_json = ?,
+		    health_json = ?, insights_json = ?, graph_json = ?, node_count = ?, edge_count = ?, error_message = ?
 		WHERE id = ?
 	`,
+		record.TargetID,
 		string(record.Status),
 		timeString(record.CompletedAt),
 		record.UpdatedAt.UTC().Format(time.RFC3339Nano),
 		string(seedsJSON),
 		string(optionsJSON),
 		string(healthJSON),
+		insightsJSON,
 		graphJSON,
 		record.NodeCount,
 		record.EdgeCount,
@@ -221,8 +275,8 @@ func (s *Store) UpdateScan(record *ScanRecord) error {
 
 func (s *Store) GetScan(id string) (*ScanRecord, error) {
 	row := s.db.QueryRow(`
-		SELECT id, status, started_at, completed_at, updated_at, seeds_json, options_json,
-		       health_json, graph_json, node_count, edge_count, error_message
+		SELECT id, target_id, status, started_at, completed_at, updated_at, seeds_json, options_json,
+		       health_json, insights_json, graph_json, node_count, edge_count, error_message
 		FROM scans
 		WHERE id = ?
 	`, id)
@@ -241,8 +295,8 @@ func (s *Store) ListScans(limit int) ([]*ScanRecord, error) {
 		limit = 20
 	}
 	rows, err := s.db.Query(`
-		SELECT id, status, started_at, completed_at, updated_at, seeds_json, options_json,
-		       health_json, graph_json, node_count, edge_count, error_message
+		SELECT id, target_id, status, started_at, completed_at, updated_at, seeds_json, options_json,
+		       health_json, insights_json, graph_json, node_count, edge_count, error_message
 		FROM scans
 		ORDER BY started_at DESC
 		LIMIT ?
@@ -266,6 +320,203 @@ func (s *Store) ListScans(limit int) ([]*ScanRecord, error) {
 	}
 	if out == nil {
 		out = []*ScanRecord{}
+	}
+	return out, nil
+}
+
+// ListScansByTarget returns scans associated with a target.
+func (s *Store) ListScansByTarget(targetID string, limit int) ([]*ScanRecord, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	rows, err := s.db.Query(`
+		SELECT id, target_id, status, started_at, completed_at, updated_at, seeds_json, options_json,
+		       health_json, insights_json, graph_json, node_count, edge_count, error_message
+		FROM scans
+		WHERE target_id = ?
+		ORDER BY started_at DESC
+		LIMIT ?
+	`, targetID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("listing target scans: %w", err)
+	}
+	defer rows.Close()
+
+	var out []*ScanRecord
+	for rows.Next() {
+		record, err := scanFromRow(rows.Scan)
+		if err != nil {
+			return nil, err
+		}
+		record.Graph = nil
+		out = append(out, record)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating target scans: %w", err)
+	}
+	if out == nil {
+		out = []*ScanRecord{}
+	}
+	return out, nil
+}
+
+// CreateTarget persists a target.
+func (s *Store) CreateTarget(target *Target) error {
+	_, err := s.db.Exec(`
+		INSERT INTO targets (id, slug, display_name, notes, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, target.ID, target.Slug, target.DisplayName, target.Notes, target.CreatedAt.UTC().Format(time.RFC3339Nano), target.UpdatedAt.UTC().Format(time.RFC3339Nano))
+	if err != nil {
+		return fmt.Errorf("creating target: %w", err)
+	}
+	return nil
+}
+
+// UpdateTarget persists target changes.
+func (s *Store) UpdateTarget(target *Target) error {
+	_, err := s.db.Exec(`
+		UPDATE targets
+		SET slug = ?, display_name = ?, notes = ?, updated_at = ?
+		WHERE id = ?
+	`, target.Slug, target.DisplayName, target.Notes, target.UpdatedAt.UTC().Format(time.RFC3339Nano), target.ID)
+	if err != nil {
+		return fmt.Errorf("updating target: %w", err)
+	}
+	return nil
+}
+
+// DeleteTarget removes a target and its aliases.
+func (s *Store) DeleteTarget(targetID string) error {
+	_, err := s.db.Exec(`DELETE FROM targets WHERE id = ?`, targetID)
+	if err != nil {
+		return fmt.Errorf("deleting target: %w", err)
+	}
+	return nil
+}
+
+// GetTarget loads a target by id or slug.
+func (s *Store) GetTarget(ref string) (*Target, error) {
+	row := s.db.QueryRow(`
+		SELECT id, slug, display_name, notes, created_at, updated_at
+		FROM targets
+		WHERE id = ? OR slug = ?
+		LIMIT 1
+	`, ref, ref)
+	target, err := targetFromRow(row.Scan)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("target %s not found", ref)
+	}
+	if err != nil {
+		return nil, err
+	}
+	target.Aliases, err = s.listTargetAliases(target.ID)
+	if err != nil {
+		return nil, err
+	}
+	return target, nil
+}
+
+// ListTargets returns all persisted targets with aliases.
+func (s *Store) ListTargets() ([]*Target, error) {
+	rows, err := s.db.Query(`
+		SELECT id, slug, display_name, notes, created_at, updated_at
+		FROM targets
+		ORDER BY display_name ASC, slug ASC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("listing targets: %w", err)
+	}
+	defer rows.Close()
+
+	var out []*Target
+	for rows.Next() {
+		target, err := targetFromRow(rows.Scan)
+		if err != nil {
+			return nil, err
+		}
+		target.Aliases, err = s.listTargetAliases(target.ID)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, target)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating targets: %w", err)
+	}
+	if out == nil {
+		out = []*Target{}
+	}
+	return out, nil
+}
+
+// AddTargetAlias adds a seed alias to a target.
+func (s *Store) AddTargetAlias(alias *TargetAlias) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("starting alias transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	if alias.IsPrimary {
+		if _, err := tx.Exec(`UPDATE target_aliases SET is_primary = 0 WHERE target_id = ?`, alias.TargetID); err != nil {
+			return fmt.Errorf("clearing primary alias: %w", err)
+		}
+	}
+
+	if _, err := tx.Exec(`
+		INSERT INTO target_aliases (id, target_id, seed_type, seed_value, label, is_primary, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, alias.ID, alias.TargetID, alias.SeedType, alias.SeedValue, alias.Label, boolToInt(alias.IsPrimary), alias.CreatedAt.UTC().Format(time.RFC3339Nano)); err != nil {
+		return fmt.Errorf("creating target alias: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing alias transaction: %w", err)
+	}
+	return nil
+}
+
+// RemoveTargetAlias removes a persisted alias from a target.
+func (s *Store) RemoveTargetAlias(targetID, aliasID string) error {
+	_, err := s.db.Exec(`DELETE FROM target_aliases WHERE id = ? AND target_id = ?`, aliasID, targetID)
+	if err != nil {
+		return fmt.Errorf("removing target alias: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) listTargetAliases(targetID string) ([]TargetAlias, error) {
+	rows, err := s.db.Query(`
+		SELECT id, target_id, seed_type, seed_value, label, is_primary, created_at
+		FROM target_aliases
+		WHERE target_id = ?
+		ORDER BY is_primary DESC, created_at ASC, seed_type ASC, seed_value ASC
+	`, targetID)
+	if err != nil {
+		return nil, fmt.Errorf("listing target aliases: %w", err)
+	}
+	defer rows.Close()
+
+	var out []TargetAlias
+	for rows.Next() {
+		var alias TargetAlias
+		var rawCreated string
+		var isPrimary int
+		if err := rows.Scan(&alias.ID, &alias.TargetID, &alias.SeedType, &alias.SeedValue, &alias.Label, &isPrimary, &rawCreated); err != nil {
+			return nil, fmt.Errorf("scanning target alias: %w", err)
+		}
+		alias.IsPrimary = isPrimary == 1
+		alias.CreatedAt, err = time.Parse(time.RFC3339Nano, rawCreated)
+		if err != nil {
+			return nil, fmt.Errorf("parsing alias created_at: %w", err)
+		}
+		out = append(out, alias)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating target aliases: %w", err)
+	}
+	if out == nil {
+		out = []TargetAlias{}
 	}
 	return out, nil
 }
@@ -358,16 +609,19 @@ func (s *Store) ListEvents(scanID string, afterSeq int64) ([]ScanEvent, error) {
 
 func scanFromRow(scan func(dest ...any) error) (*ScanRecord, error) {
 	var record ScanRecord
+	var targetID string
 	var rawStarted string
 	var rawCompleted sql.NullString
 	var rawUpdated string
 	var seedsJSON string
 	var optionsJSON string
 	var healthJSON string
+	var insightsJSON sql.NullString
 	var graphJSON sql.NullString
 
 	err := scan(
 		&record.ID,
+		&targetID,
 		&record.Status,
 		&rawStarted,
 		&rawCompleted,
@@ -375,6 +629,7 @@ func scanFromRow(scan func(dest ...any) error) (*ScanRecord, error) {
 		&seedsJSON,
 		&optionsJSON,
 		&healthJSON,
+		&insightsJSON,
 		&graphJSON,
 		&record.NodeCount,
 		&record.EdgeCount,
@@ -383,6 +638,7 @@ func scanFromRow(scan func(dest ...any) error) (*ScanRecord, error) {
 	if err != nil {
 		return nil, err
 	}
+	record.TargetID = targetID
 
 	record.StartedAt, err = time.Parse(time.RFC3339Nano, rawStarted)
 	if err != nil {
@@ -407,6 +663,13 @@ func scanFromRow(scan func(dest ...any) error) (*ScanRecord, error) {
 	}
 	if err := json.Unmarshal([]byte(healthJSON), &record.Health); err != nil {
 		return nil, fmt.Errorf("decoding module health: %w", err)
+	}
+	if insightsJSON.Valid && insightsJSON.String != "" {
+		var insights ScanInsights
+		if err := json.Unmarshal([]byte(insightsJSON.String), &insights); err != nil {
+			return nil, fmt.Errorf("decoding scan insights: %w", err)
+		}
+		record.Insights = &insights
 	}
 	if graphJSON.Valid && graphJSON.String != "" {
 		record.Graph, err = decodeGraph([]byte(graphJSON.String))
@@ -441,11 +704,37 @@ func decodeGraph(data []byte) (*graph.Graph, error) {
 	return out, nil
 }
 
+func targetFromRow(scan func(dest ...any) error) (*Target, error) {
+	var target Target
+	var rawCreated string
+	var rawUpdated string
+	if err := scan(&target.ID, &target.Slug, &target.DisplayName, &target.Notes, &rawCreated, &rawUpdated); err != nil {
+		return nil, err
+	}
+	var err error
+	target.CreatedAt, err = time.Parse(time.RFC3339Nano, rawCreated)
+	if err != nil {
+		return nil, fmt.Errorf("parsing target created_at: %w", err)
+	}
+	target.UpdatedAt, err = time.Parse(time.RFC3339Nano, rawUpdated)
+	if err != nil {
+		return nil, fmt.Errorf("parsing target updated_at: %w", err)
+	}
+	return &target, nil
+}
+
 func timeString(value *time.Time) any {
 	if value == nil {
 		return nil
 	}
 	return value.UTC().Format(time.RFC3339Nano)
+}
+
+func boolToInt(value bool) int {
+	if value {
+		return 1
+	}
+	return 0
 }
 
 func tempDBPath(dir string) string {
