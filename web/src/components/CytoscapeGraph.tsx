@@ -6,7 +6,7 @@ import { fontFamilies } from "../lib/typography";
 
 cytoscape.use(dagre);
 
-/** CSS variable resolver — reads computed values from :root so Cytoscape can use them. */
+/** CSS variable resolver - reads computed values from :root so Cytoscape can use them. */
 function cssVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
@@ -233,7 +233,7 @@ export const CytoscapeGraph = forwardRef<CytoscapeGraphHandle, CytoscapeGraphPro
         userPanningEnabled: true,
         boxSelectionEnabled: false,
         autounselectify: false,
-        wheelSensitivity: 0.3,
+        wheelSensitivity: 0.8,
         minZoom: 0.1,
         maxZoom: 4,
       });

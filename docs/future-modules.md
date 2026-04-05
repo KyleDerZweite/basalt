@@ -54,7 +54,7 @@ Deferred despite being attractive:
 
 ---
 
-## Tier 1 — Zero Auth JSON APIs (high signal, easy to implement)
+## Tier 1 - Zero Auth JSON APIs (high signal, easy to implement)
 
 ### Speedrun.com (username)
 - URL: `GET https://www.speedrun.com/api/v1/users?name={username}` or `/users/{id}`
@@ -101,7 +101,7 @@ Deferred despite being attractive:
 
 ---
 
-## Tier 2 — Zero Auth but Scraping or XML
+## Tier 2 - Zero Auth but Scraping or XML
 
 ### BoardGameGeek (username)
 - URL: `GET https://boardgamegeek.com/xmlapi2/user?name={username}`
@@ -144,7 +144,7 @@ Deferred despite being attractive:
 - Detection: 200 / 404
 - Data: biography, location, occupation, education, outbound links to major social networks
 - Method: HTML scraping
-- Notes: Users create these specifically to centralize identity — a pre-compiled, curated master list of active platforms
+- Notes: Users create these specifically to centralize identity - a pre-compiled, curated master list of active platforms
 
 ### Goodreads (username)
 - URL: `https://www.goodreads.com/user/show/{id}-{username}`
@@ -167,7 +167,7 @@ Deferred despite being attractive:
 
 ---
 
-## Tier 3 — Infrastructure & Email Enrichment (unique data sources)
+## Tier 3 - Infrastructure & Email Enrichment (unique data sources)
 
 ### GitHub Commit Email Harvesting (username)
 - URL: `GET https://api.github.com/users/{username}/events/public`
@@ -271,7 +271,7 @@ Deferred despite being attractive:
 
 ---
 
-## Tier 4 — Requires API Key (via ~/.basalt/config)
+## Tier 4 - Requires API Key (via ~/.basalt/config)
 
 ### Last.fm (username)
 - URL: `GET http://ws.audioscrobbler.com/2.0/?method=user.getinfo&user={username}&api_key={key}&format=json`
@@ -373,7 +373,7 @@ Deferred despite being attractive:
 
 ---
 
-## Tier 5 — Anti-Bot Protected (requires headless browser or advanced techniques)
+## Tier 5 - Anti-Bot Protected (requires headless browser or advanced techniques)
 
 ### LeetCode (username)
 - URL: `POST https://leetcode.com/graphql` with `operationName: getUserProfile`
@@ -401,11 +401,11 @@ Deferred despite being attractive:
 - URL: "Find Friends" search pathway
 - Method: Search by `{FirstName} {LastInitial}` within city constraints
 - Data: profile picture, reviewed establishments, elite status, geographic origin
-- Notes: Session cookies required. Reveals localized movement patterns — dining, medical, nightlife
+- Notes: Session cookies required. Reveals localized movement patterns - dining, medical, nightlife
 
 ---
 
-## Tier 6 — Web3 and Cryptographic Identity
+## Tier 6 - Web3 and Cryptographic Identity
 
 ### Ethereum Name Service / ENS (username.eth)
 - URL: `GET https://metadata.ens.domains/mainnet/{contractAddress}/{tokenId}`
@@ -423,7 +423,7 @@ Deferred despite being attractive:
 ## Research Notes
 
 ### Password Reset Telemetry
-Platforms like Amazon, Apple, Twitter, Microsoft leak partial contact info during password reset (masked phone numbers like `**73`, masked emails like `j****@h******.com`). Cross-reference with breach data to validate. Requires headless browsing and CAPTCHA bypass — complex but highest fidelity linkage.
+Platforms like Amazon, Apple, Twitter, Microsoft leak partial contact info during password reset (masked phone numbers like `**73`, masked emails like `j****@h******.com`). Cross-reference with breach data to validate. Requires headless browsing and CAPTCHA bypass - complex but highest fidelity linkage.
 
 ### Breach Enrichment
 Commercial APIs (Clearbit, Hunter.io) map emails to corporate identities and LinkedIn profiles. Free tiers available for targeted, high-value resolution when enumeration fails.

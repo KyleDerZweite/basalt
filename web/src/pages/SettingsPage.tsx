@@ -247,7 +247,7 @@ export function SettingsPage({
                 onClick={handleAcceptLegal}
                 disabled={saving}
               >
-                {saving ? "Saving…" : "I Accept — Use Responsibly"}
+                {saving ? "Saving…" : "I Accept - Use Responsibly"}
               </button>
             </div>
           )}

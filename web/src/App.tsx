@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, startTransition, useCallback, useEffect, useMemo, useState } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 
@@ -8,11 +8,23 @@ import { api } from "./lib/api";
 import { asMessage } from "./lib/format";
 import { ACTIVE_STATUSES, getRouteLabel, themeStorageKey } from "./lib/constants";
 import { HomePage } from "./pages/HomePage";
-import { NewScanPage } from "./pages/NewScanPage";
-import { ScanWorkspacePage } from "./pages/ScanWorkspacePage";
-import { SettingsPage } from "./pages/SettingsPage";
-import { TargetsPage } from "./pages/TargetsPage";
 import type { Bootstrap, ModuleStatus, ScanRecord, Settings, Target, ThemeMode } from "./types";
+
+const NewScanPage = lazy(() =>
+  import("./pages/NewScanPage").then((module) => ({ default: module.NewScanPage }))
+);
+
+const ScanWorkspacePage = lazy(() =>
+  import("./pages/ScanWorkspacePage").then((module) => ({ default: module.ScanWorkspacePage }))
+);
+
+const SettingsPage = lazy(() =>
+  import("./pages/SettingsPage").then((module) => ({ default: module.SettingsPage }))
+);
+
+const TargetsPage = lazy(() =>
+  import("./pages/TargetsPage").then((module) => ({ default: module.TargetsPage }))
+);
 
 export function App() {
   const [bootstrap, setBootstrap] = useState<Bootstrap | null>(null);
@@ -81,9 +93,34 @@ export function App() {
     }
   }, [isMobileShell, location.pathname]);
 
-  // Workspace is full-bleed — no page padding
+  // Workspace is full-bleed - no page padding
   const isWorkspace = location.pathname.startsWith("/scans/");
   const routeLabel = getRouteLabel(location.pathname);
+  const routeFallback = (
+    <div
+      style={{
+        minHeight: isWorkspace ? "calc(100vh - 56px)" : 240,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <div
+        className="card"
+        style={{
+          padding: "14px 18px",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 12,
+        }}
+      >
+        <div className="spinner" />
+        <span className="mono" style={{ fontSize: 11, color: "var(--text-muted)" }}>
+          Loading route…
+        </span>
+      </div>
+    </div>
+  );
 
   return (
     <div className="app-layout">
@@ -120,50 +157,52 @@ export function App() {
         )}
 
         <div className={`page-content${isWorkspace ? " no-padding" : ""}`}>
-          <Routes>
-            <Route
-              path="/"
-              element={
-                <HomePage
-                  scans={scans}
-                  targets={targets}
-                  health={health}
-                />
-              }
-            />
-            <Route
-              path="/targets"
-              element={<TargetsPage targets={targets} onRefresh={refreshHome} />}
-            />
-            <Route
-              path="/new"
-              element={
-                <NewScanPage
-                  targets={targets}
-                  settings={settings}
-                  health={health}
-                  onCreated={refreshHome}
-                />
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                <SettingsPage
-                  settings={settings}
-                  bootstrap={bootstrap}
-                  health={health}
-                  theme={theme}
-                  onToggleTheme={() => setTheme((c) => (c === "dark" ? "light" : "dark"))}
-                  onRefresh={refreshHome}
-                />
-              }
-            />
-            <Route
-              path="/scans/:scanID"
-              element={<ScanWorkspacePage onRefreshHome={refreshHome} />}
-            />
-          </Routes>
+          <Suspense fallback={routeFallback}>
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  <HomePage
+                    scans={scans}
+                    targets={targets}
+                    health={health}
+                  />
+                }
+              />
+              <Route
+                path="/targets"
+                element={<TargetsPage targets={targets} onRefresh={refreshHome} />}
+              />
+              <Route
+                path="/new"
+                element={
+                  <NewScanPage
+                    targets={targets}
+                    settings={settings}
+                    health={health}
+                    onCreated={refreshHome}
+                  />
+                }
+              />
+              <Route
+                path="/settings"
+                element={
+                  <SettingsPage
+                    settings={settings}
+                    bootstrap={bootstrap}
+                    health={health}
+                    theme={theme}
+                    onToggleTheme={() => setTheme((c) => (c === "dark" ? "light" : "dark"))}
+                    onRefresh={refreshHome}
+                  />
+                }
+              />
+              <Route
+                path="/scans/:scanID"
+                element={<ScanWorkspacePage onRefreshHome={refreshHome} />}
+              />
+            </Routes>
+          </Suspense>
         </div>
       </div>
     </div>

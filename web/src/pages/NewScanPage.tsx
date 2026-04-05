@@ -55,6 +55,7 @@ export function NewScanPage({ targets, settings, health, onCreated }: NewScanPag
     () => targets.find((t) => t.slug === targetRef || t.id === targetRef) ?? null,
     [targets, targetRef]
   );
+  const selectedTargetAliasCount = selectedTarget?.aliases?.length ?? 0;
 
   const addSeed = useCallback(() => {
     setSeeds((prev) => [...prev, { type: "username", value: "" }]);
@@ -74,8 +75,14 @@ export function NewScanPage({ targets, settings, health, onCreated }: NewScanPag
     e.preventDefault();
     const validSeeds = seeds.filter((s) => s.value.trim() !== "");
     if (validSeeds.length === 0) {
-      setError("Add at least one seed value.");
-      return;
+      if (!selectedTarget) {
+        setError("Add at least one seed value or select a target.");
+        return;
+      }
+      if (selectedTargetAliasCount === 0) {
+        setError("Selected target has no aliases. Add a seed or configure target aliases first.");
+        return;
+      }
     }
 
     setLoading(true);
@@ -85,7 +92,7 @@ export function NewScanPage({ targets, settings, health, onCreated }: NewScanPag
       const scan = await api<ScanRecord>("/api/scans", {
         method: "POST",
         body: JSON.stringify({
-          seeds: validSeeds,
+          seeds: validSeeds.length > 0 ? validSeeds : undefined,
           depth,
           concurrency,
           timeout_seconds: timeout,
@@ -135,13 +142,13 @@ export function NewScanPage({ targets, settings, health, onCreated }: NewScanPag
                 value={targetRef}
                 onChange={(e) => setTargetRef(e.target.value)}
               >
-                <option value="">No target — anonymous scan</option>
+                <option value="">No target - anonymous scan</option>
                 {targets.map((t) => (
                   <option key={t.id} value={t.slug}>{t.display_name}</option>
                 ))}
               </select>
               <span className="form-hint">
-                Linking to a target associates results and pre-fills seeds from aliases.
+                Selecting a target links results and can launch a scan from its stored aliases even if manual seeds are empty.
               </span>
             </div>
 
@@ -157,6 +164,9 @@ export function NewScanPage({ targets, settings, health, onCreated }: NewScanPag
                   + Add Seed
                 </button>
               </div>
+              <span className="form-hint">
+                Manual seeds are optional when the selected target already has aliases configured.
+              </span>
               <div className="seeds-list">
                 {seeds.map((seed, i) => (
                   <SeedInputRow
@@ -188,7 +198,7 @@ export function NewScanPage({ targets, settings, health, onCreated }: NewScanPag
                 <div className="scan-settings-body">
                   {/* Depth */}
                   <div className="form-group">
-                    <label className="form-label">Pivot Depth — {depth}</label>
+                    <label className="form-label">Pivot Depth - {depth}</label>
                     <input
                       type="range"
                       min={1}
@@ -295,7 +305,9 @@ export function NewScanPage({ targets, settings, health, onCreated }: NewScanPag
                           .filter((s) => s.value.trim())
                           .map((s) => `${s.type}: ${s.value}`)
                           .join("\n")
-                      : "None configured"
+                      : selectedTargetAliasCount > 0
+                        ? `Using ${selectedTargetAliasCount} stored alias${selectedTargetAliasCount === 1 ? "" : "es"} from target`
+                        : "None configured"
                   }
                   font={pretextFonts.previewValue}
                   lineHeight={lineHeights.body}

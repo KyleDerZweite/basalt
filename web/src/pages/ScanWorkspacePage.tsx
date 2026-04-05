@@ -212,7 +212,7 @@ export function ScanWorkspacePage({ onRefreshHome }: ScanWorkspacePageProps) {
             <div className="graph-building-overlay">
               <div className="spinner" />
               <div className="build-label">
-                {isConnected ? "SCANNING — BUILDING GRAPH" : "CONNECTING…"}
+                {isConnected ? "SCANNING - BUILDING GRAPH" : "CONNECTING…"}
               </div>
             </div>
           )}

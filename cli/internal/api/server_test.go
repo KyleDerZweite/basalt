@@ -69,6 +69,39 @@ func TestStartScanRequiresSeeds(t *testing.T) {
 	}
 }
 
+func TestStartScanWithTargetAliasesOnly(t *testing.T) {
+	harness := testHarness(t, Options{})
+
+	target, err := harness.service.CreateTarget(app.Target{
+		DisplayName: "Kyle",
+		Slug:        "kyle",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := harness.service.AddTargetAlias(target.Slug, graph.Seed{Type: graph.NodeTypeUsername, Value: "kylederzweite"}, "", true); err != nil {
+		t.Fatal(err)
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/scans", bytes.NewReader([]byte(`{"target_ref":"kyle","depth":1}`)))
+	harness.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected 202 for target-only scan, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var record app.ScanRecord
+	if err := json.Unmarshal(rec.Body.Bytes(), &record); err != nil {
+		t.Fatal(err)
+	}
+	if record.TargetID != target.ID {
+		t.Fatalf("expected target id %q, got %q", target.ID, record.TargetID)
+	}
+	if len(record.Seeds) != 1 || record.Seeds[0].Value != "kylederzweite" {
+		t.Fatalf("expected resolved target alias seed, got %+v", record.Seeds)
+	}
+}
+
 func TestServerRequiresBearerAuthWhenConfigured(t *testing.T) {
 	handler := testServer(t, Options{AuthToken: "secret-token"})
 
