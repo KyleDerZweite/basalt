@@ -1,228 +1,353 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { ArrowRight, ChevronUp, ChevronDown } from "lucide-react";
 
-import { SectionHeading } from "../components/SectionHeading";
+import { PretextBlock } from "../components/PretextBlock";
+import { SeedInputRow } from "../components/SeedInputRow";
 import { api } from "../lib/api";
-import { asMessage, splitCommaList } from "../lib/format";
-import { updateSeed } from "../lib/seeds";
-import type { ScanRecord, Seed, Settings, Target } from "../types";
+import { asMessage } from "../lib/format";
+import { lineHeights, pretextFonts } from "../lib/typography";
+import type { ModuleStatus, ScanRecord, Seed, Settings, Target } from "../types";
 
-type NewScanPageProps = {
+interface NewScanPageProps {
   targets: Target[];
   settings: Settings | null;
+  health: ModuleStatus[];
   onCreated: () => Promise<void>;
-};
+}
 
-export function NewScanPage({ targets, settings, onCreated }: NewScanPageProps) {
+const DEFAULT_SEEDS: Seed[] = [{ type: "username", value: "" }];
+
+export function NewScanPage({ targets, settings, health, onCreated }: NewScanPageProps) {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const requestedTarget = searchParams.get("target") ?? "";
-  const [targetRef, setTargetRef] = useState("");
-  const [seeds, setSeeds] = useState<Seed[]>([{ type: "username", value: "" }]);
+  const [params] = useSearchParams();
+
+  // Form state
+  const [targetRef, setTargetRef] = useState<string>(params.get("target") ?? "");
+  const [seeds, setSeeds] = useState<Seed[]>(DEFAULT_SEEDS);
   const [depth, setDepth] = useState(2);
   const [concurrency, setConcurrency] = useState(5);
-  const [timeoutSeconds, setTimeoutSeconds] = useState(10);
+  const [timeout, setTimeout_] = useState(10);
   const [strictMode, setStrictMode] = useState(settings?.strict_mode ?? false);
-  const [disabledModules, setDisabledModules] = useState((settings?.disabled_modules ?? []).join(", "));
-  const [localError, setLocalError] = useState("");
+  const [disabledModules, setDisabledModules] = useState<string[]>(settings?.disabled_modules ?? []);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
+  // Pre-fill seed from quick-launch
   useEffect(() => {
-    setStrictMode(settings?.strict_mode ?? false);
-    setDisabledModules((settings?.disabled_modules ?? []).join(", "));
-  }, [settings]);
+    const quickSeed = params.get("seed");
+    if (quickSeed) {
+      setSeeds([{ type: "username", value: quickSeed }]);
+    }
+  }, [params]);
 
+  // Pre-fill seeds from selected target
   useEffect(() => {
-    if (!requestedTarget) {
-      return;
+    if (!targetRef) return;
+    const target = targets.find((t) => t.slug === targetRef || t.id === targetRef);
+    if (target?.aliases?.length) {
+      setSeeds(target.aliases.map((a) => ({ type: a.seed_type, value: a.seed_value })));
     }
-    if (targets.some((target) => target.slug === requestedTarget)) {
-      setTargetRef((current) => current || requestedTarget);
-    }
-  }, [requestedTarget, targets]);
+  }, [targetRef, targets]);
 
   const selectedTarget = useMemo(
-    () => targets.find((target) => target.slug === targetRef) ?? null,
-    [targetRef, targets],
+    () => targets.find((t) => t.slug === targetRef || t.id === targetRef) ?? null,
+    [targets, targetRef]
   );
-  const explicitSeeds = seeds.filter((seed) => seed.value.trim() !== "");
-  const disabledCount = splitCommaList(disabledModules).length;
 
-  async function createScan(event: React.FormEvent) {
-    event.preventDefault();
+  const addSeed = useCallback(() => {
+    setSeeds((prev) => [...prev, { type: "username", value: "" }]);
+  }, []);
+
+  const removeSeed = useCallback((index: number) => {
+    setSeeds((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const toggleModule = (name: string) => {
+    setDisabledModules((prev) =>
+      prev.includes(name) ? prev.filter((m) => m !== name) : [...prev, name]
+    );
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const validSeeds = seeds.filter((s) => s.value.trim() !== "");
+    if (validSeeds.length === 0) {
+      setError("Add at least one seed value.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
     try {
-      const payload = {
-        target_ref: targetRef || undefined,
-        seeds: explicitSeeds,
-        depth,
-        concurrency,
-        timeout_seconds: timeoutSeconds,
-        strict_mode: strictMode,
-        disabled_modules: splitCommaList(disabledModules),
-      };
-      const created = await api<ScanRecord>("/api/scans", {
+      const scan = await api<ScanRecord>("/api/scans", {
         method: "POST",
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          seeds: validSeeds,
+          depth,
+          concurrency,
+          timeout_seconds: timeout,
+          strict_mode: strictMode,
+          disabled_modules: disabledModules.length > 0 ? disabledModules : undefined,
+          target_ref: targetRef || undefined,
+        }),
       });
       await onCreated();
-      navigate(`/scans/${created.id}`);
+      navigate(`/scans/${scan.id}`);
     } catch (reason) {
-      setLocalError(asMessage(reason));
+      setError(asMessage(reason));
+      setLoading(false);
     }
-  }
+  };
 
   return (
-    <section className="page stack-xl">
-      {localError ? <div className="error-banner">{localError}</div> : null}
+    <div>
+      <div className="page-header">
+        <div className="page-header-kicker">Investigation</div>
+        <PretextBlock
+          as="h1"
+          className="page-header-title"
+          text="New Scan"
+          font={pretextFonts.pageTitle}
+          lineHeight={lineHeights.title}
+        />
+        <PretextBlock
+          as="p"
+          className="page-header-desc"
+          text="Configure seeds and settings, then launch an investigation."
+          font={pretextFonts.pageDescription}
+          lineHeight={lineHeights.body}
+        />
+      </div>
 
-      <form className="stack-xl" onSubmit={createScan}>
-        <section className="surface">
-          <div className="launch-layout">
-            <div className="stack">
-              <SectionHeading
-                kicker="Scope"
-                title="Mission profile"
-                summary="Combine a saved dossier with extra seeds only when the case actually needs more explicit pivots."
-              />
+      {error && <div className="error-banner">{error}</div>}
 
-              <label className="field">
-                <span>Target dossier</span>
-                <select value={targetRef} onChange={(event) => setTargetRef(event.target.value)}>
-                  <option value="">No saved target</option>
-                  {targets.map((target) => (
-                    <option key={target.id} value={target.slug}>
-                      {target.display_name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+      <form onSubmit={handleSubmit}>
+        <div className="scan-form-layout">
+          {/* Left: form */}
+          <div className="scan-form">
+            {/* Target picker */}
+            <div className="form-group">
+              <label className="form-label">Target (optional)</label>
+              <select
+                value={targetRef}
+                onChange={(e) => setTargetRef(e.target.value)}
+              >
+                <option value="">No target — anonymous scan</option>
+                {targets.map((t) => (
+                  <option key={t.id} value={t.slug}>{t.display_name}</option>
+                ))}
+              </select>
+              <span className="form-hint">
+                Linking to a target associates results and pre-fills seeds from aliases.
+              </span>
+            </div>
 
-              <div className="target-preview">
-                <strong>{selectedTarget ? selectedTarget.display_name : "Ad hoc scan"}</strong>
-                <p>
-                  {selectedTarget
-                    ? (selectedTarget.aliases ?? []).map((alias) => `${alias.seed_type}:${alias.seed_value}`).join(" · ") || "No aliases stored on this dossier."
-                    : "This scan will rely only on the explicit seeds you add below."}
-                </p>
+            {/* Seeds */}
+            <div>
+              <div className="section-head">
+                <span className="section-title">Seeds</span>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={addSeed}
+                >
+                  + Add Seed
+                </button>
               </div>
-
-              <div className="stack">
-                <div className="section-heading">
-                  <div>
-                    <div className="section-kicker">Extra seeds</div>
-                    <h3>Explicit pivots</h3>
-                  </div>
-                  <button
-                    className="button secondary subtle"
-                    type="button"
-                    onClick={() => setSeeds((current) => [...current, { type: "username", value: "" }])}
-                  >
-                    Add seed
-                  </button>
-                </div>
-
-                <div className="seed-list">
-                  {seeds.map((seed, index) => (
-                    <div className="seed-row" key={`${seed.type}-${index}`}>
-                      <select value={seed.type} onChange={(event) => updateSeed(seeds, setSeeds, index, { type: event.target.value })}>
-                        <option value="username">username</option>
-                        <option value="email">email</option>
-                        <option value="domain">domain</option>
-                      </select>
-                      <input
-                        value={seed.value}
-                        onChange={(event) => updateSeed(seeds, setSeeds, index, { value: event.target.value })}
-                        placeholder="identifier"
-                      />
-                      <button
-                        className="button secondary subtle"
-                        type="button"
-                        onClick={() => setSeeds((current) => current.filter((_, itemIndex) => itemIndex !== index))}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                </div>
+              <div className="seeds-list">
+                {seeds.map((seed, i) => (
+                  <SeedInputRow
+                    key={i}
+                    seed={seed}
+                    index={i}
+                    seeds={seeds}
+                    onChange={setSeeds}
+                    onRemove={() => removeSeed(i)}
+                    canRemove={seeds.length > 1}
+                  />
+                ))}
               </div>
             </div>
 
-            <aside className="launch-brief">
-              <div className="mini-label">Launch brief</div>
-              <strong>{selectedTarget?.display_name ?? (explicitSeeds[0] ? explicitSeeds[0].value : "Awaiting inputs")}</strong>
-              <p>
-                {selectedTarget
-                  ? "Saved aliases will stay attached to this scan and make later reruns cleaner."
-                  : "Ad hoc scans are useful when you need to move quickly without creating a persistent dossier first."}
-              </p>
-              <dl className="brief-list">
-                <div>
-                  <dt>Saved aliases</dt>
-                  <dd>{selectedTarget?.aliases?.length ?? 0}</dd>
+            {/* Advanced settings */}
+            <div className="scan-settings-section">
+              <div
+                className="scan-settings-toggle"
+                onClick={() => setAdvancedOpen((o) => !o)}
+              >
+                <span className="scan-settings-toggle-title">Advanced Settings</span>
+                <span style={{ color: "var(--text-muted)", fontSize: 13 }}>
+                  {advancedOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </span>
+              </div>
+
+              {advancedOpen && (
+                <div className="scan-settings-body">
+                  {/* Depth */}
+                  <div className="form-group">
+                    <label className="form-label">Pivot Depth — {depth}</label>
+                    <input
+                      type="range"
+                      min={1}
+                      max={5}
+                      value={depth}
+                      onChange={(e) => setDepth(Number(e.target.value))}
+                    />
+                    <span className="form-hint">How many hops to follow from the initial seeds.</span>
+                  </div>
+
+                  {/* Concurrency */}
+                  <div className="form-group">
+                    <label className="form-label">Concurrency</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={concurrency}
+                      onChange={(e) => setConcurrency(Number(e.target.value))}
+                    />
+                    <span className="form-hint">Number of modules running in parallel.</span>
+                  </div>
+
+                  {/* Timeout */}
+                  <div className="form-group">
+                    <label className="form-label">Timeout (seconds)</label>
+                    <input
+                      type="number"
+                      min={5}
+                      max={120}
+                      value={timeout}
+                      onChange={(e) => setTimeout_(Number(e.target.value))}
+                    />
+                  </div>
+
+                  {/* Strict mode */}
+                  <div className="toggle-row">
+                    <div className="toggle-info">
+                      <div className="toggle-label">Strict Mode</div>
+                      <div className="toggle-desc">Only include high-confidence results.</div>
+                    </div>
+                    <label className="toggle">
+                      <input
+                        type="checkbox"
+                        checked={strictMode}
+                        onChange={(e) => setStrictMode(e.target.checked)}
+                      />
+                      <span className="toggle-slider" />
+                    </label>
+                  </div>
+
+                  {/* Disabled modules */}
+                  {health.length > 0 && (
+                    <div className="form-group">
+                      <label className="form-label">Disable Modules</label>
+                      <div className="modules-checkbox-grid">
+                        {[...health]
+                          .sort((a, b) => a.name.localeCompare(b.name))
+                          .map((mod) => (
+                            <label key={mod.name} className="module-checkbox-item">
+                              <input
+                                type="checkbox"
+                                checked={disabledModules.includes(mod.name)}
+                                onChange={() => toggleModule(mod.name)}
+                              />
+                              {mod.name}
+                            </label>
+                          ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <dt>Explicit seeds</dt>
-                  <dd>{explicitSeeds.length}</dd>
-                </div>
-                <div>
-                  <dt>Mode</dt>
-                  <dd>{strictMode ? "strict" : "standard"}</dd>
-                </div>
-                <div>
-                  <dt>Disabled modules</dt>
-                  <dd>{disabledCount}</dd>
-                </div>
-              </dl>
-            </aside>
-          </div>
-        </section>
+              )}
+            </div>
 
-        <section className="surface">
-          <SectionHeading
-            kicker="Execution"
-            title="Runtime controls"
-            summary="Tune the breadth and speed of collection before you open the workspace."
-          />
-
-          <div className="config-grid">
-            <label className="field">
-              <span>Depth</span>
-              <input type="number" min={1} value={depth} onChange={(event) => setDepth(Number(event.target.value) || 1)} />
-            </label>
-            <label className="field">
-              <span>Concurrency</span>
-              <input type="number" min={1} value={concurrency} onChange={(event) => setConcurrency(Number(event.target.value) || 1)} />
-            </label>
-            <label className="field">
-              <span>Timeout seconds</span>
-              <input
-                type="number"
-                min={1}
-                value={timeoutSeconds}
-                onChange={(event) => setTimeoutSeconds(Number(event.target.value) || 1)}
-              />
-            </label>
-          </div>
-
-          <label className="field">
-            <span>Disabled modules</span>
-            <textarea value={disabledModules} onChange={(event) => setDisabledModules(event.target.value)} placeholder="github,reddit" />
-          </label>
-
-          <label className="checkbox">
-            <input type="checkbox" checked={strictMode} onChange={(event) => setStrictMode(event.target.checked)} />
-            <span>Strict mode</span>
-          </label>
-
-          <div className="action-row">
-            <button className="button" type="submit">
-              Start scan
+            {/* Submit */}
+            <button
+              type="submit"
+              className="btn btn-primary btn-full btn-lg"
+              disabled={loading}
+            >
+              {loading ? "Launching…" : <>Launch Scan <ArrowRight size={14} /></>}
             </button>
-            <Link className="button secondary" to="/targets">
-              Manage targets
-            </Link>
           </div>
-        </section>
+
+          {/* Right: preview */}
+          <div className="scan-preview-card">
+            <div className="scan-preview-label">Scan Preview</div>
+            <div className="scan-preview-body">
+              <div className="scan-preview-row">
+                <div className="scan-preview-key">Target</div>
+                <div className="scan-preview-val">
+                  {selectedTarget ? selectedTarget.display_name : "Anonymous"}
+                </div>
+              </div>
+
+              <div className="scan-preview-row">
+                <div className="scan-preview-key">Seeds</div>
+                <PretextBlock
+                  className="scan-preview-val"
+                  text={
+                    seeds.filter((s) => s.value.trim()).length > 0
+                      ? seeds
+                          .filter((s) => s.value.trim())
+                          .map((s) => `${s.type}: ${s.value}`)
+                          .join("\n")
+                      : "None configured"
+                  }
+                  font={pretextFonts.previewValue}
+                  lineHeight={lineHeights.body}
+                  whiteSpace="pre-wrap"
+                />
+              </div>
+
+              <div className="scan-preview-row">
+                <div className="scan-preview-key">Depth</div>
+                <div className="scan-preview-val">{depth}</div>
+              </div>
+
+              <div className="scan-preview-row">
+                <div className="scan-preview-key">Concurrency</div>
+                <div className="scan-preview-val">{concurrency}</div>
+              </div>
+
+              <div className="scan-preview-row">
+                <div className="scan-preview-key">Timeout</div>
+                <div className="scan-preview-val">{timeout}s</div>
+              </div>
+
+              <div className="scan-preview-row">
+                <div className="scan-preview-key">Strict Mode</div>
+                <div className="scan-preview-val">{strictMode ? "Yes" : "No"}</div>
+              </div>
+
+              {disabledModules.length > 0 && (
+                <div className="scan-preview-row">
+                  <div className="scan-preview-key">Disabled</div>
+                  <PretextBlock
+                    className="scan-preview-val"
+                    text={disabledModules.join(", ")}
+                    font={pretextFonts.previewValue}
+                    lineHeight={lineHeights.body}
+                  />
+                </div>
+              )}
+
+              {/* Module health summary */}
+              {health.length > 0 && (
+                <div className="scan-preview-row">
+                  <div className="scan-preview-key">Modules</div>
+                  <div className="scan-preview-val" style={{ color: "var(--success)" }}>
+                    {health.filter((m) => m.status === "healthy" && !disabledModules.includes(m.name)).length} ready
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </form>
-    </section>
+    </div>
   );
 }

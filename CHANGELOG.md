@@ -11,11 +11,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - `basalt serve` command for the local desktop/web product API
 - HTTP API endpoints for scans, results, events, exports, module health, and settings
 - Walker progress events for module verification, execution, discoveries, and failures
+- Web workspace (`basalt web`) with React 19, Vite 8, TypeScript
+- Pages: Home (dashboard), New Scan, Targets, Scan Workspace, Settings
+- Graph visualization via cytoscape with dagre layout
+- Live scan event timeline via polling
+- Target management with persistent aliases
+- Dark and light theme support
+- `lucide-react` icon library replacing Unicode symbol icons
 
 ### Changed
 - `scan` now uses the shared application service layer instead of wiring the walker directly in the command
 - Scan runs are persisted locally and can be re-exported later from the local API
 - Default local app data lives in `~/.basalt`
+- Web UI design flattened: removed gradient overlays, backdrop-filter blur, noise textures, and oversized border radii in favor of flat surfaces with 1px borders and tight spacing
 
 ## [0.2.0] - 2026-03-31
 

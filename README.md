@@ -97,6 +97,10 @@ Local runtime data is stored in `~/.basalt` by default unless `--data-dir` is ov
 ## Development
 
 ```bash
+cd web
+pnpm install
+pnpm build
+
 cd cli
 go build ./...
 go vet ./...

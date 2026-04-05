@@ -1,11 +1,12 @@
 import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
+import { Menu, X } from "lucide-react";
 
-import { AppShell } from "./components/AppShell";
-import { PageLead } from "./components/PageLead";
+import { Sidebar } from "./components/Sidebar";
+import { useMediaQuery } from "./hooks/useMediaQuery";
 import { api } from "./lib/api";
-import { asMessage, pageTitle } from "./lib/format";
-import { themeStorageKey } from "./lib/constants";
+import { asMessage } from "./lib/format";
+import { ACTIVE_STATUSES, getRouteLabel, themeStorageKey } from "./lib/constants";
 import { HomePage } from "./pages/HomePage";
 import { NewScanPage } from "./pages/NewScanPage";
 import { ScanWorkspacePage } from "./pages/ScanWorkspacePage";
@@ -21,15 +22,19 @@ export function App() {
   const [health, setHealth] = useState<ModuleStatus[]>([]);
   const [error, setError] = useState("");
   const [theme, setTheme] = useState<ThemeMode>(() => {
-    if (typeof window === "undefined") {
-      return "light";
-    }
+    if (typeof window === "undefined") return "dark";
     const stored = window.localStorage.getItem(themeStorageKey);
-    return stored === "dark" ? "dark" : "light";
+    return stored === "light" ? "light" : "dark";
   });
+
   const location = useLocation();
-  const pageMeta = useMemo(() => pageTitle(location.pathname), [location.pathname]);
-  const liveScanCount = scans.filter((scan) => ["queued", "verifying", "running"].includes(scan.status)).length;
+  const isMobileShell = useMediaQuery("(max-width: 1023px)");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  const liveScanCount = useMemo(
+    () => scans.filter((s) => (ACTIVE_STATUSES as readonly string[]).includes(s.status)).length,
+    [scans]
+  );
 
   const refreshHome = useCallback(async () => {
     try {
@@ -56,6 +61,13 @@ export function App() {
 
   useEffect(() => {
     void refreshHome();
+    
+    // Global poll for status updates every 10 seconds
+    const timer = setInterval(() => {
+      void refreshHome();
+    }, 10000);
+    
+    return () => clearInterval(timer);
   }, [refreshHome]);
 
   useEffect(() => {
@@ -63,31 +75,97 @@ export function App() {
     window.localStorage.setItem(themeStorageKey, theme);
   }, [theme]);
 
+  useEffect(() => {
+    if (isMobileShell) {
+      setMobileNavOpen(false);
+    }
+  }, [isMobileShell, location.pathname]);
+
+  // Workspace is full-bleed — no page padding
+  const isWorkspace = location.pathname.startsWith("/scans/");
+  const routeLabel = getRouteLabel(location.pathname);
+
   return (
-    <AppShell
-      liveScanCount={liveScanCount}
-      targetCount={targets.length}
-      theme={theme}
-      onToggleTheme={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
-    >
-      {location.pathname !== "/" && !location.pathname.startsWith("/scans/") ? (
-        <PageLead
-          kicker={pageMeta.kicker}
-          title={pageMeta.title}
-          summary={pageMeta.summary}
-          detail={bootstrap ? `${bootstrap.base_url} · v${bootstrap.version}` : undefined}
-        />
-      ) : null}
+    <div className="app-layout">
+      <Sidebar
+        liveScanCount={liveScanCount}
+        bootstrap={bootstrap}
+        mobileOpen={mobileNavOpen}
+        isMobile={isMobileShell}
+        onRequestClose={() => setMobileNavOpen(false)}
+      />
 
-      {error ? <div className="error-banner">{error}</div> : null}
+      <div className="app-main">
+        {isMobileShell && !isWorkspace && (
+          <header className="mobile-topbar">
+            <button
+              className="mobile-topbar-btn"
+              type="button"
+              onClick={() => setMobileNavOpen((current) => !current)}
+              aria-label={mobileNavOpen ? "Close navigation" : "Open navigation"}
+            >
+              {mobileNavOpen ? <X size={16} /> : <Menu size={16} />}
+            </button>
+            <div className="mobile-topbar-copy">
+              <span className="mobile-topbar-brand">Basalt</span>
+              <span className="mobile-topbar-route">{routeLabel}</span>
+            </div>
+          </header>
+        )}
 
-      <Routes>
-        <Route path="/" element={<HomePage scans={scans} targets={targets} health={health} settings={settings} />} />
-        <Route path="/targets" element={<TargetsPage targets={targets} onRefresh={refreshHome} />} />
-        <Route path="/new" element={<NewScanPage targets={targets} settings={settings} onCreated={refreshHome} />} />
-        <Route path="/settings" element={<SettingsPage settings={settings} bootstrap={bootstrap} onRefresh={refreshHome} theme={theme} />} />
-        <Route path="/scans/:scanID" element={<ScanWorkspacePage onRefreshHome={refreshHome} />} />
-      </Routes>
-    </AppShell>
+        {error && (
+          <div style={{ padding: "8px 20px 0" }}>
+            <div className="error-banner">{error}</div>
+          </div>
+        )}
+
+        <div className={`page-content${isWorkspace ? " no-padding" : ""}`}>
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <HomePage
+                  scans={scans}
+                  targets={targets}
+                  health={health}
+                />
+              }
+            />
+            <Route
+              path="/targets"
+              element={<TargetsPage targets={targets} onRefresh={refreshHome} />}
+            />
+            <Route
+              path="/new"
+              element={
+                <NewScanPage
+                  targets={targets}
+                  settings={settings}
+                  health={health}
+                  onCreated={refreshHome}
+                />
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <SettingsPage
+                  settings={settings}
+                  bootstrap={bootstrap}
+                  health={health}
+                  theme={theme}
+                  onToggleTheme={() => setTheme((c) => (c === "dark" ? "light" : "dark"))}
+                  onRefresh={refreshHome}
+                />
+              }
+            />
+            <Route
+              path="/scans/:scanID"
+              element={<ScanWorkspacePage onRefreshHome={refreshHome} />}
+            />
+          </Routes>
+        </div>
+      </div>
+    </div>
   );
 }

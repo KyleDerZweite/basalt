@@ -19,13 +19,21 @@ Thanks for your interest in contributing to Basalt! This document covers the pro
 
 ## Development
 
-All Go source lives under `cli/`. See [AGENTS.md](AGENTS.md) for architecture, build commands, and conventions.
+All Go source lives under `cli/`, all web UI source under `web/`. See [AGENTS.md](AGENTS.md) for architecture, build commands, and conventions.
 
 ```bash
+# Go backend
 cd cli
 go build ./...        # build
 go test ./...         # test
 go vet ./...          # lint
+
+# Web frontend
+cd web
+pnpm install          # install deps
+pnpm dev              # dev server
+pnpm build            # production build
+pnpm typecheck        # type check
 ```
 
 ## Adding a Module
@@ -45,6 +53,15 @@ Every module must include a `*_test.go` file with at least:
 - `TestExtractFound` -- happy path with a mock HTTP server
 - `TestExtractNotFound` -- 404 handling
 - `TestVerify` -- health check
+
+## Working on the Web UI
+
+The frontend is a React 19 + TypeScript SPA in `web/`. Key conventions:
+
+- Icons come from `lucide-react`. Import individual icons, not the barrel export.
+- All styling is plain CSS in `web/src/index.css` using CSS custom properties. No Tailwind, no CSS-in-JS.
+- Components live in `web/src/components/`, pages in `web/src/pages/`.
+- Run `pnpm build` after changes to update the assets embedded in the Go binary.
 
 ## Submitting Changes
 

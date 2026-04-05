@@ -9,6 +9,14 @@ go run . web
 
 Default address: `http://127.0.0.1:8788`
 
+To rebuild the embedded frontend assets during development:
+
+```bash
+cd web
+pnpm install
+pnpm build
+```
+
 To keep the server running without opening a browser:
 
 ```bash
@@ -83,6 +91,42 @@ Current browser functionality focuses on operations rather than styling:
   "base_url": "http://127.0.0.1:8788"
 }
 ```
+
+## Technology Stack
+
+| Layer | Choice |
+|---|---|
+| Framework | React 19, TypeScript 5.9 |
+| Build | Vite 8, pnpm |
+| Routing | react-router-dom 7 |
+| Icons | lucide-react (tree-shakeable SVGs) |
+| Graph | cytoscape + cytoscape-dagre |
+| Text layout | @chenglou/pretext |
+| Styling | Hand-written CSS (no Tailwind, no component library) |
+
+The build outputs to `cli/internal/webui/dist/` and is embedded into the Go binary. The frontend has no server of its own; `basalt web` serves both the SPA and the API on the same localhost origin.
+
+## Design System
+
+All styling is in `web/src/index.css` using CSS custom properties. Key tokens:
+
+- **Colors**: accent `#d99a71`, backgrounds `--bg-base` / `--bg-surface` / `--bg-elevated`, borders `--border-dim` / `--border` / `--border-strong`, text `--text-primary` / `--text-secondary` / `--text-muted`
+- **Radii**: 2-6px for structural elements, `999px` for pills/chips/dots only
+- **Shadows**: `0 2px 8px` on overlays only (mobile sidebar, panel overlay)
+- **Fonts**: IBM Plex Mono (headings), JetBrains Mono (body)
+- **Theming**: dark (default) and light modes via `[data-theme="light"]` on `<html>`
+
+The design is intentionally flat and dense for a data-heavy OSINT tool. No gradients, no backdrop-filter, no noise textures.
+
+## Icons
+
+All icons are from `lucide-react`. Imported individually per component:
+
+```tsx
+import { Home, ArrowRight, X } from "lucide-react";
+```
+
+Standard sizing: `12-14px` for inline buttons, `16px` for navigation, `24px` for empty states.
 
 ## Notes
 

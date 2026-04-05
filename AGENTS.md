@@ -4,7 +4,7 @@ Guidelines for AI coding agents working on this codebase.
 
 ## Orientation
 
-This is a Go CLI tool. All source is in `cli/`. Read the code, not this file, for implementation details. These docs describe intent and conventions only.
+Two codebases in one repo: a Go CLI (`cli/`) and a React web dashboard (`web/`). The web build output is embedded into the Go binary at `cli/internal/webui/dist/`.
 
 Entry point: `cli/main.go` -> `cli/cmd/root.go` (Cobra CLI).
 
@@ -13,11 +13,19 @@ Module path: `github.com/KyleDerZweite/basalt`.
 ## Build & Run
 
 ```bash
+# Go backend
 cd cli
 go build -o basalt .    # build
 go vet ./...            # lint
 go test ./...           # all tests
 go test ./internal/modules/github/ -v  # single module
+
+# Web frontend
+cd web
+pnpm install            # install deps
+pnpm build              # production build -> cli/internal/webui/dist/
+pnpm dev                # dev server with hot reload
+pnpm typecheck          # tsc --noEmit
 ```
 
 ## Architecture
@@ -105,6 +113,64 @@ Edge IDs are assigned by the walker, not by modules (modules pass `0`).
 - **Context**: all long-running operations accept `context.Context` and must check cancellation
 - **Testing**: every module has tests using `httptest.NewServer` with a `baseURL` override
 - **Confidence**: modules assign their own confidence scores (0.0-1.0). Degraded modules get halved by the walker.
+
+## Web Frontend
+
+### Stack
+
+React 19, TypeScript, Vite 8. No CSS framework; all styling is hand-written in `web/src/index.css`. Build output goes to `cli/internal/webui/dist/` and is embedded into the Go binary.
+
+### Key dependencies
+
+- `lucide-react` for icons (tree-shakeable SVGs)
+- `cytoscape` + `cytoscape-dagre` for graph visualization
+- `react-router-dom` for client-side routing
+- `@chenglou/pretext` for text layout measurement
+
+### File structure
+
+```
+web/src/
+  components/       Reusable UI (Sidebar, FindingCard, NodeInspector, ...)
+  pages/            Full page views (HomePage, NewScanPage, ScanWorkspacePage, ...)
+  hooks/            Custom React hooks (useCytoscapeGraph, useScanEvents, ...)
+  lib/              Utilities (api.ts, constants.ts, format.ts, typography.ts)
+  types.ts          Shared TypeScript types
+  index.css         All styling (design tokens, components, responsive)
+  App.tsx            Root component with routing
+  main.tsx          React entry point
+```
+
+### Design system
+
+All styling lives in `index.css`. No Tailwind, no CSS-in-JS. Key conventions:
+
+- **CSS variables** for all colors, spacing, and radii. Defined in `:root`, overridden in `[data-theme="light"]`.
+- **Flat surfaces**: `var(--bg-base)`, `var(--bg-surface)`, `var(--bg-elevated)`. No gradients, no backdrop-filter.
+- **Sharp corners**: `--radius-sm: 2px`, `--radius: 4px`, `--radius-lg: 4px`, `--radius-xl: 6px`. Pill shapes (`999px`) only for status pills, chips, dots, and progress bars.
+- **Tight shadows**: `--shadow-panel: 0 2px 8px rgba(...)`. Only on overlays (mobile sidebar, panel overlay).
+- **Dense padding**: utilitarian, not spacious. Card headers `10px 14px`, card bodies `12px`, page content `20px 24px`.
+- **Fonts**: IBM Plex Mono (display/headings), JetBrains Mono (body/code).
+- **Accent**: `#d99a71` (warm amber). Status colors: success green, danger red, warning yellow, info blue.
+
+### Icons
+
+All icons use `lucide-react`. Import individual icons:
+
+```tsx
+import { Home, ArrowRight, X } from "lucide-react";
+<Home size={16} />
+```
+
+Standard sizes: `12-14` for inline/button icons, `16` for nav icons, `24` for empty state display icons. Do not use Unicode symbols or emoji as icons.
+
+### Conventions
+
+- No component libraries (shadcn, radix, etc.). Raw HTML elements with CSS classes.
+- State management via React hooks only (no Redux, Zustand, etc.).
+- API calls go through `lib/api.ts` (thin fetch wrapper hitting the Go backend).
+- Theme toggle via `data-theme` attribute on `<html>`, persisted in localStorage.
+- Mobile responsiveness via CSS media queries and the `useMediaQuery` hook.
 
 ## Things to Avoid
 
