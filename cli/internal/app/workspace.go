@@ -141,25 +141,38 @@ func BuildScanInsights(g *graph.Graph, health []ModuleStatus, status ScanStatus)
 	return insights
 }
 
-// BuildWorkspaceGraph builds the synthesized UI graph.
+// BuildWorkspaceGraph builds the synthesized UI graph as a radial mindmap.
+// The root node sits at the center (depth 0), seeds and category branches
+// form the first ring (depth 1), and leaf discoveries sit in the outer
+// ring (depth 2).
 func BuildWorkspaceGraph(record *ScanRecord, target *Target) WorkspaceGraph {
 	graphView := WorkspaceGraph{
-		Layout: "mindmap",
+		Layout: "concentric",
 		Nodes:  []WorkspaceNode{},
 		Edges:  []WorkspaceEdge{},
 	}
 
+	// Determine root node. Single-seed optimization: when there is no
+	// target and exactly one seed, the seed itself becomes the root so
+	// it sits at the very center of the mindmap.
 	rootID := "scan-root"
 	rootLabel := "Scan"
+	singleSeedRoot := false
 	if target != nil {
 		rootID = "target:" + target.ID
 		rootLabel = target.DisplayName
+	} else if record != nil && len(record.Seeds) == 1 {
+		seed := record.Seeds[0]
+		rootID = "seed:" + seed.Type + ":" + seed.Value
+		rootLabel = seed.Value
+		singleSeedRoot = true
 	}
 	graphView.Nodes = append(graphView.Nodes, WorkspaceNode{
 		ID:       rootID,
 		Label:    rootLabel,
 		Type:     "target",
 		Category: "root",
+		Depth:    0,
 	})
 
 	added := map[string]struct{}{rootID: {}}
@@ -176,6 +189,7 @@ func BuildWorkspaceGraph(record *ScanRecord, target *Target) WorkspaceGraph {
 			Label:    label,
 			Type:     "category",
 			Category: category,
+			Depth:    1,
 		})
 		graphView.Edges = append(graphView.Edges, WorkspaceEdge{
 			ID:     "edge:" + rootID + ":" + branchID,
@@ -185,52 +199,47 @@ func BuildWorkspaceGraph(record *ScanRecord, target *Target) WorkspaceGraph {
 		})
 		return branchID
 	}
-	addItemNode := func(branchID string, node WorkspaceNode, edgeType string) {
+	addItemNode := func(parentID string, node WorkspaceNode, edgeType string) {
 		if _, ok := added[node.ID]; ok {
 			return
 		}
 		added[node.ID] = struct{}{}
 		graphView.Nodes = append(graphView.Nodes, node)
 		graphView.Edges = append(graphView.Edges, WorkspaceEdge{
-			ID:     "edge:" + branchID + ":" + node.ID,
-			Source: branchID,
+			ID:     "edge:" + parentID + ":" + node.ID,
+			Source: parentID,
 			Target: node.ID,
 			Type:   edgeType,
 		})
 	}
 
+	// Connect seeds/aliases directly to root (no intermediate branch).
 	if target != nil {
-		branchID := ""
 		for _, alias := range target.Aliases {
-			if branchID == "" {
-				branchID = addBranchNode("aliases", "Aliases")
-			}
 			aliasNodeID := "alias:" + alias.ID
 			label := alias.SeedValue
 			if alias.Label != "" {
 				label = alias.Label + " (" + alias.SeedValue + ")"
 			}
-			addItemNode(branchID, WorkspaceNode{
+			addItemNode(rootID, WorkspaceNode{
 				ID:       aliasNodeID,
 				Label:    label,
 				Type:     alias.SeedType,
-				Category: "aliases",
-			}, "alias")
+				Category: "seed",
+				Depth:    1,
+			}, "seed")
 		}
-	} else if record != nil {
-		branchID := ""
+	} else if record != nil && !singleSeedRoot {
+		// Multiple seeds — connect each directly to root.
 		for _, seed := range record.Seeds {
-			if branchID == "" {
-				branchID = addBranchNode("aliases", "Seeds")
-			}
-			label := seed.Value
 			nodeID := "seed:" + seed.Type + ":" + seed.Value
-			addItemNode(branchID, WorkspaceNode{
+			addItemNode(rootID, WorkspaceNode{
 				ID:       nodeID,
-				Label:    label,
+				Label:    seed.Value,
 				Type:     seed.Type,
-				Category: "aliases",
-			}, "alias")
+				Category: "seed",
+				Depth:    1,
+			}, "seed")
 		}
 	}
 
@@ -247,6 +256,7 @@ func BuildWorkspaceGraph(record *ScanRecord, target *Target) WorkspaceGraph {
 					Label:    warning,
 					Type:     "warning",
 					Category: "warnings",
+					Depth:    2,
 				}, "warning")
 			}
 		}
@@ -273,6 +283,7 @@ func BuildWorkspaceGraph(record *ScanRecord, target *Target) WorkspaceGraph {
 				Label:          "Additional infrastructure pivots",
 				Type:           "summary",
 				Category:       "infra",
+				Depth:          2,
 				CollapsedCount: hidden,
 				RawNodeIDs:     collectNodeIDs(dedupedInfra[len(visibleInfra):]),
 			}, "summary")
@@ -288,6 +299,7 @@ func BuildWorkspaceGraph(record *ScanRecord, target *Target) WorkspaceGraph {
 				Label:    warning,
 				Type:     "warning",
 				Category: "warnings",
+				Depth:    2,
 			}, "warning")
 		}
 		if hidden := len(record.Insights.Warnings) - minInt(len(record.Insights.Warnings), 3); hidden > 0 {
@@ -296,6 +308,7 @@ func BuildWorkspaceGraph(record *ScanRecord, target *Target) WorkspaceGraph {
 				Label:          "Additional warnings",
 				Type:           "summary",
 				Category:       "warnings",
+				Depth:          2,
 				CollapsedCount: hidden,
 			}, "summary")
 		}
@@ -388,6 +401,7 @@ func workspaceNodeFromRaw(node *graph.Node, category string) WorkspaceNode {
 		Label:      node.Label,
 		Type:       node.Type,
 		Category:   category,
+		Depth:      2,
 		RawNodeIDs: []string{node.ID},
 		ProfileURL: stringProperty(node.Properties, "profile_url"),
 		Confidence: node.Confidence,

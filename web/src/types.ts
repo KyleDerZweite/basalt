@@ -83,6 +83,7 @@ export type WorkspaceNode = {
   label: string;
   type: string;
   category: string;
+  depth?: number;
   raw_node_ids?: string[];
   raw_edge_ids?: string[];
   profile_url?: string;
@@ -137,6 +138,7 @@ export type GraphNodeData = {
   label: string;
   category: string;
   type: string;
+  depth?: number;
   confidence?: number;
   collapsedCount?: number;
   profileURL?: string;

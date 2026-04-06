@@ -11,6 +11,7 @@ export function useCytoscapeGraph(graph: ScanWorkspace["graph"]): cytoscape.Elem
         label: node.label,
         category: node.category,
         type: node.type,
+        depth: node.depth ?? 0,
         confidence: node.confidence ?? 0,
         collapsedCount: node.collapsed_count ?? 0,
         profileURL: node.profile_url ?? "",

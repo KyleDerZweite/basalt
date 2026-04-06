@@ -128,6 +128,7 @@ type WorkspaceNode struct {
 	Label          string   `json:"label"`
 	Type           string   `json:"type"`
 	Category       string   `json:"category"`
+	Depth          int      `json:"depth,omitempty"`
 	RawNodeIDs     []string `json:"raw_node_ids,omitempty"`
 	RawEdgeIDs     []string `json:"raw_edge_ids,omitempty"`
 	ProfileURL     string   `json:"profile_url,omitempty"`

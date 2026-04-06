@@ -1,10 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import cytoscape from "cytoscape";
-// @ts-expect-error cytoscape-dagre has no bundled types
-import dagre from "cytoscape-dagre";
 import { fontFamilies } from "../lib/typography";
-
-cytoscape.use(dagre);
 
 /** CSS variable resolver - reads computed values from :root so Cytoscape can use them. */
 function cssVar(name: string): string {
@@ -52,17 +48,17 @@ function buildStylesheet(): cytoscape.StylesheetStyle[] {
       },
     },
 
-    // ── Alias node (rounded rect, amber border)
+    // ── Seed node (directly connected to root, accent-tinted)
     {
-      selector: 'node[category = "aliases"]',
+      selector: 'node[category = "seed"]',
       style: {
         shape: "round-rectangle",
-        "background-color": cssVar("--bg-elevated"),
+        "background-color": cssVar("--accent-soft"),
         "border-color": cssVar("--accent-dim"),
-        "border-width": 1.5,
-        color: cssVar("--text-secondary"),
-        width: 130,
-        height: 48,
+        "border-width": 2,
+        color: cssVar("--accent"),
+        width: 140,
+        height: 52,
       },
     },
 
@@ -124,6 +120,16 @@ function buildStylesheet(): cytoscape.StylesheetStyle[] {
       },
     },
 
+    // ── Depth-based sizing for radial rings
+    {
+      selector: "node[depth = 0]",
+      style: { width: 160, height: 72, "font-size": 14, "font-weight": "bold" },
+    },
+    {
+      selector: "node[depth = 2]",
+      style: { width: 120, height: 42, "font-size": 10 },
+    },
+
     // ── Selected state
     {
       selector: "node:selected",
@@ -152,7 +158,7 @@ function buildStylesheet(): cytoscape.StylesheetStyle[] {
         "target-arrow-color": cssVar("--border"),
         "target-arrow-shape": "triangle",
         "arrow-scale": 0.8,
-        "curve-style": "bezier",
+        "curve-style": "straight",
         width: 1.5,
         opacity: 0.7,
       },
@@ -171,16 +177,14 @@ function buildStylesheet(): cytoscape.StylesheetStyle[] {
       },
     },
 
-    // ── Alias edge (lighter)
+    // ── Seed edge (accent, connects seeds to root)
     {
-      selector: 'edge[type = "alias"]',
+      selector: 'edge[type = "seed"]',
       style: {
         "line-color": cssVar("--accent-dim"),
         "target-arrow-color": cssVar("--accent-dim"),
-        "line-style": "dashed",
-        "line-dash-pattern": [4, 4],
-        width: 1,
-        opacity: 0.6,
+        width: 1.5,
+        opacity: 0.7,
       },
     },
 
@@ -284,12 +288,14 @@ export const CytoscapeGraph = forwardRef<CytoscapeGraphHandle, CytoscapeGraphPro
 
       if (elements.length > 0) {
         cy.layout({
-          name: "dagre",
-          rankDir: "LR",
-          nodeSep: 80,
-          rankSep: 160,
-          edgeSep: 20,
-          ranker: "network-simplex",
+          name: "concentric",
+          concentric: (node: cytoscape.NodeSingular) => {
+            const depth = (node.data("depth") as number) ?? 0;
+            // Higher value = closer to center. Max depth 2 → values 2, 1, 0
+            return 2 - depth;
+          },
+          levelWidth: () => 1,
+          minNodeSpacing: 60,
           animate: false,
           padding: 40,
         } as cytoscape.LayoutOptions).run();
@@ -308,13 +314,15 @@ export const CytoscapeGraph = forwardRef<CytoscapeGraphHandle, CytoscapeGraphPro
       cy.fit(undefined, 40);
     }, [resizeKey]);
 
-    // Sync selection highlighting
+    // Sync selection highlighting — select node + its connected edges
     useEffect(() => {
       const cy = cyRef.current;
       if (!cy) return;
       cy.elements().unselect();
       if (selectedNodeId) {
-        cy.$id(selectedNodeId).select();
+        const node = cy.$id(selectedNodeId);
+        node.select();
+        node.connectedEdges().select();
       }
     }, [selectedNodeId]);
 
