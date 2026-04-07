@@ -123,7 +123,7 @@ React 19, TypeScript, Vite 8. No CSS framework; all styling is hand-written in `
 ### Key dependencies
 
 - `lucide-react` for icons (tree-shakeable SVGs)
-- `cytoscape` + `cytoscape-dagre` for graph visualization
+- `cytoscape` for graph visualization (concentric radial layout, no external layout plugins)
 - `react-router-dom` for client-side routing
 - `@chenglou/pretext` for text layout measurement
 

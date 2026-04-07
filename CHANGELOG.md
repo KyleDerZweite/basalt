@@ -6,24 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-04-07
+
 ### Added
 - Local product backend with persisted scan history, SQLite storage, local settings, and scan event streams
 - `basalt serve` command for the local desktop/web product API
+- `basalt web` command to launch the browser workspace
 - HTTP API endpoints for scans, results, events, exports, module health, and settings
 - Walker progress events for module verification, execution, discoveries, and failures
-- Web workspace (`basalt web`) with React 19, Vite 8, TypeScript
+- Web workspace with React 19, Vite 8, TypeScript, embedded in the Go binary
 - Pages: Home (dashboard), New Scan, Targets, Scan Workspace, Settings
-- Graph visualization via cytoscape with dagre layout
+- Concentric mindmap graph visualization via cytoscape with depth-based radial rings
 - Live scan event timeline via polling
 - Target management with persistent aliases
 - Dark and light theme support
-- `lucide-react` icon library replacing Unicode symbol icons
+- `lucide-react` icon library for all UI icons
+- 20 new modules (38 total):
+  - **Dev/Tech**: Codeberg (username), Codeforces (username), Lichess (username)
+  - **Social**: Trello (username), Wattpad (username), MyAnimeList (username), Roblox (username)
+  - **Gaming**: Chess.com (username)
+  - **Infrastructure**: security.txt (domain)
+  - *Plus modules already shipped in v0.2.0 patch updates: DEV.to, Keybase, Hacker News, Docker Hub, Shodan, Wayback Machine, IPinfo, Spotify, Telegram, Medium, OP.GG*
 
 ### Changed
 - `scan` now uses the shared application service layer instead of wiring the walker directly in the command
 - Scan runs are persisted locally and can be re-exported later from the local API
 - Default local app data lives in `~/.basalt`
 - Web UI design flattened: removed gradient overlays, backdrop-filter blur, noise textures, and oversized border radii in favor of flat surfaces with 1px borders and tight spacing
+- Graph layout changed from left-to-right dagre hierarchy to concentric radial mindmap with the target/seed at center
+- Seeds and aliases connect directly to the root node instead of through an intermediate category branch
+- Single-seed scans promote the seed to the center root node for a cleaner graph
+- Replaced `cytoscape-dagre` dependency with cytoscape built-in concentric layout
+- Selected graph nodes now highlight their connected edges
 
 ## [0.2.0] - 2026-03-31
 
