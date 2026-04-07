@@ -67,6 +67,47 @@ func TestGraphAddNodeDedup(t *testing.T) {
 	}
 }
 
+func TestGraphUpsertNodeMergesEvidence(t *testing.T) {
+	g := New()
+
+	first := NewNode(NodeTypeEmail, "kyle@example.com", "github")
+	first.Confidence = 0.60
+	first.Properties["company"] = "Basalt"
+	mutation := g.UpsertNode(first)
+	if !mutation.Added {
+		t.Fatal("expected first upsert to add a node")
+	}
+
+	second := NewNode(NodeTypeEmail, "kyle@example.com", "gravatar")
+	second.Pivot = true
+	second.Confidence = 0.90
+	second.Properties["avatar"] = "https://example.com/avatar.png"
+	mutation = g.UpsertNode(second)
+	if mutation.Added {
+		t.Fatal("expected second upsert to merge into existing node")
+	}
+	if !mutation.BecamePivot {
+		t.Fatal("expected merged node to become pivotable")
+	}
+
+	node := g.GetNode(first.ID)
+	if node == nil {
+		t.Fatal("expected merged node to exist")
+	}
+	if !node.Pivot {
+		t.Fatal("expected merged node to preserve pivot=true")
+	}
+	if node.Confidence != 0.90 {
+		t.Fatalf("expected merged confidence 0.90, got %.2f", node.Confidence)
+	}
+	if node.Properties["company"] != "Basalt" {
+		t.Fatalf("expected original property to survive merge, got %#v", node.Properties["company"])
+	}
+	if node.Properties["avatar"] != "https://example.com/avatar.png" {
+		t.Fatalf("expected new property to be added, got %#v", node.Properties["avatar"])
+	}
+}
+
 func TestGraphEdgesNotDeduplicated(t *testing.T) {
 	g := New()
 	e1 := NewEdge(g.NextEdgeID(), "a", "b", EdgeTypeHasAccount, "github")

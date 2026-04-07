@@ -17,17 +17,20 @@ import (
 )
 
 var (
-	flagUsernames   []string
-	flagEmails      []string
-	flagDomains     []string
-	flagDepth       int
-	flagConcurrency int
-	flagTimeout     int
-	flagConfigPath  string
-	flagTargetRef   string
-	flagDataDir     string
-	flagExport      []string
-	flagVerbose     bool
+	flagUsernames        []string
+	flagEmails           []string
+	flagDomains          []string
+	flagDepth            int
+	flagConcurrency      int
+	flagTimeout          int
+	flagConfigPath       string
+	flagTargetRef        string
+	flagDataDir          string
+	flagExport           []string
+	flagVerbose          bool
+	flagRefreshHealth    bool
+	flagClearHealthCache bool
+	flagModuleHealthTTL  time.Duration
 )
 
 var scanCmd = &cobra.Command{
@@ -58,16 +61,22 @@ func init() {
 	scanCmd.Flags().StringVar(&flagDataDir, "data-dir", app.DefaultDataDir(), "Path to local app data directory")
 	scanCmd.Flags().StringSliceVar(&flagExport, "export", nil, "Export format: json, csv")
 	scanCmd.Flags().BoolVarP(&flagVerbose, "verbose", "v", false, "Show module health and debug info")
+	scanCmd.Flags().BoolVar(&flagRefreshHealth, "refresh-module-health", false, "Bypass cached module health and verify modules now")
+	scanCmd.Flags().BoolVar(&flagClearHealthCache, "clear-module-health-cache", false, "Clear cached module health before verifying")
+	scanCmd.Flags().DurationVar(&flagModuleHealthTTL, "module-health-ttl", 0, "Override cached module health TTL for fresh verification results (for example 90m or 4h)")
 }
 
 func runScan(cmd *cobra.Command, args []string) error {
 	request := app.ScanRequest{
-		Seeds:          collectSeeds(),
-		Depth:          flagDepth,
-		Concurrency:    flagConcurrency,
-		TimeoutSeconds: flagTimeout,
-		ConfigPath:     flagConfigPath,
-		TargetRef:      flagTargetRef,
+		Seeds:                  collectSeeds(),
+		Depth:                  flagDepth,
+		Concurrency:            flagConcurrency,
+		TimeoutSeconds:         flagTimeout,
+		ConfigPath:             flagConfigPath,
+		TargetRef:              flagTargetRef,
+		RefreshModuleHealth:    flagRefreshHealth,
+		ClearModuleHealthCache: flagClearHealthCache,
+		ModuleHealthTTLSeconds: int(flagModuleHealthTTL / time.Second),
 	}
 	if len(request.Seeds) == 0 && request.TargetRef == "" {
 		return fmt.Errorf("at least one seed required (-u, -e, or -d), or use --target")
@@ -84,6 +93,8 @@ func runScan(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("verifying modules: %w", err)
 	}
 	printHealthSummary(health, flagVerbose)
+	request.RefreshModuleHealth = false
+	request.ClearModuleHealthCache = false
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

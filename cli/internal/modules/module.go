@@ -35,6 +35,20 @@ func (s HealthStatus) String() string {
 	}
 }
 
+// ParseHealthStatus converts a wire-safe status string back into a HealthStatus.
+func ParseHealthStatus(value string) (HealthStatus, bool) {
+	switch value {
+	case "healthy":
+		return Healthy, true
+	case "degraded":
+		return Degraded, true
+	case "offline":
+		return Offline, true
+	default:
+		return Healthy, false
+	}
+}
+
 // Module is the interface every OSINT extraction module must implement.
 type Module interface {
 	// Name returns a human-readable identifier (e.g., "github").

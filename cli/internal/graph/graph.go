@@ -24,6 +24,14 @@ type Graph struct {
 	errorCount  atomic.Int64
 }
 
+// NodeMutation describes the result of merging a node into the graph.
+type NodeMutation struct {
+	Node        *Node
+	Added       bool
+	Updated     bool
+	BecamePivot bool
+}
+
 // Meta contains scan metadata for the output.
 type Meta struct {
 	Version      string    `json:"basalt_version"`
@@ -72,6 +80,31 @@ func (g *Graph) AddNode(n *Node) bool {
 	}
 	g.nodes[n.ID] = n
 	return true
+}
+
+// UpsertNode inserts a node or merges new evidence into an existing node.
+func (g *Graph) UpsertNode(n *Node) NodeMutation {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	existing, exists := g.nodes[n.ID]
+	if !exists {
+		g.nodes[n.ID] = n
+		return NodeMutation{
+			Node:        n,
+			Added:       true,
+			Updated:     true,
+			BecamePivot: n.Pivot,
+		}
+	}
+
+	wasPivot := existing.Pivot
+	updated := mergeNode(existing, n)
+	return NodeMutation{
+		Node:        existing,
+		Updated:     updated,
+		BecamePivot: !wasPivot && existing.Pivot,
+	}
 }
 
 // GetNode returns a node by ID, or nil if not found.
@@ -163,4 +196,45 @@ func (g *Graph) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(out)
+}
+
+func mergeNode(dst, src *Node) bool {
+	updated := false
+
+	if dst.Label == "" && src.Label != "" {
+		dst.Label = src.Label
+		updated = true
+	}
+	if dst.SourceModule == "" && src.SourceModule != "" {
+		dst.SourceModule = src.SourceModule
+		updated = true
+	}
+	if src.Confidence > dst.Confidence {
+		dst.Confidence = src.Confidence
+		updated = true
+	}
+	if src.Pivot && !dst.Pivot {
+		dst.Pivot = true
+		updated = true
+	}
+	if src.Wave < dst.Wave {
+		dst.Wave = src.Wave
+		updated = true
+	}
+
+	if src.Properties == nil {
+		return updated
+	}
+	if dst.Properties == nil {
+		dst.Properties = make(map[string]interface{}, len(src.Properties))
+	}
+	for key, value := range src.Properties {
+		if _, exists := dst.Properties[key]; exists {
+			continue
+		}
+		dst.Properties[key] = value
+		updated = true
+	}
+
+	return updated
 }

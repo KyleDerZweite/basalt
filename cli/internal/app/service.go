@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -196,11 +197,11 @@ func (s *Service) ModuleHealth(ctx context.Context, req ScanRequest) ([]ModuleSt
 
 	disabled := makeDisabledSet(effective.DisabledModules)
 	registry := buildRegistry(cfg, disabled)
-	client := httpclient.New(httpclient.WithTimeout(time.Duration(req.TimeoutSeconds) * time.Second))
-	w := walker.New(graph.New(), registry, walker.WithClient(client), walker.WithTimeout(time.Duration(req.TimeoutSeconds)*time.Second))
-	w.VerifyAll(ctx)
-
-	health := healthFromWalker(w.HealthSummary())
+	healthSummary, err := s.resolveModuleHealth(ctx, req, registry, cfg)
+	if err != nil {
+		return nil, err
+	}
+	health := healthFromWalker(healthSummary)
 	if effective.StrictMode {
 		health = applyStrictHealth(health)
 	}
@@ -303,13 +304,29 @@ func (s *Service) executeScan(ctx context.Context, record *ScanRecord, settings 
 		}),
 	)
 
-	w.VerifyAll(ctx)
-	healthSummary := w.HealthSummary()
+	healthSummary, err := s.resolveModuleHealth(ctx, record.Options, registry, cfg)
+	if err != nil {
+		s.failScan(record, err)
+		return
+	}
+	w.SetHealthSummary(healthSummary)
 	record.Health = healthFromWalker(healthSummary)
 	if effectiveSettings.StrictMode {
 		healthSummary = applyStrictModuleHealth(healthSummary)
 		record.Health = healthFromWalker(healthSummary)
 		w.SetHealthSummary(healthSummary)
+	}
+	for _, item := range healthSummary {
+		s.publishEvent(&ScanEvent{
+			ScanID:  record.ID,
+			Time:    time.Now().UTC(),
+			Type:    "module_verified",
+			Module:  item.Module.Name(),
+			Message: item.Message,
+			Data: map[string]interface{}{
+				"status": item.Status.String(),
+			},
+		})
 	}
 	record.UpdatedAt = time.Now().UTC()
 	if err := s.store.UpdateScan(record); err != nil {
@@ -394,13 +411,110 @@ func (s *Service) loadConfig(configPath string) (*config.Config, error) {
 	return config.Load(configPath)
 }
 
+func (s *Service) resolveModuleHealth(ctx context.Context, req ScanRequest, registry *modules.Registry, cfg *config.Config) ([]walker.ModuleHealth, error) {
+	if req.ClearModuleHealthCache {
+		if err := s.store.ClearModuleHealthCache(); err != nil {
+			return nil, err
+		}
+	}
+
+	all := registry.All()
+	if len(all) == 0 {
+		return []walker.ModuleHealth{}, nil
+	}
+
+	configHash := cfg.Fingerprint()
+	now := time.Now().UTC()
+	overrideTTL := time.Duration(req.ModuleHealthTTLSeconds) * time.Second
+
+	moduleNames := make([]string, 0, len(all))
+	healthByName := make(map[string]walker.ModuleHealth, len(all))
+	for _, mod := range all {
+		moduleNames = append(moduleNames, mod.Name())
+	}
+
+	if !req.RefreshModuleHealth {
+		cached, err := s.store.LoadModuleHealthCache(s.version, configHash, moduleNames, now)
+		if err != nil {
+			return nil, err
+		}
+		for _, mod := range all {
+			entry, ok := cached[mod.Name()]
+			if !ok {
+				continue
+			}
+			status, ok := modules.ParseHealthStatus(entry.Status)
+			if !ok {
+				continue
+			}
+			healthByName[mod.Name()] = walker.ModuleHealth{
+				Module:  mod,
+				Status:  status,
+				Message: entry.Message,
+			}
+		}
+	}
+
+	var pending []modules.Module
+	for _, mod := range all {
+		if _, ok := healthByName[mod.Name()]; ok {
+			continue
+		}
+		pending = append(pending, mod)
+	}
+
+	if len(pending) > 0 {
+		pendingRegistry := modules.NewRegistry()
+		for _, mod := range pending {
+			pendingRegistry.Register(mod)
+		}
+
+		client := httpclient.New(httpclient.WithTimeout(time.Duration(req.TimeoutSeconds) * time.Second))
+		w := walker.New(
+			graph.New(),
+			pendingRegistry,
+			walker.WithClient(client),
+			walker.WithTimeout(time.Duration(req.TimeoutSeconds)*time.Second),
+		)
+		w.VerifyAll(ctx)
+
+		verified := w.HealthSummary()
+		cacheEntries := make([]ModuleHealthCacheEntry, 0, len(verified))
+		for _, item := range verified {
+			healthByName[item.Module.Name()] = item
+			cacheEntries = append(cacheEntries, ModuleHealthCacheEntry{
+				ModuleName: item.Module.Name(),
+				Version:    s.version,
+				ConfigHash: configHash,
+				Status:     item.Status.String(),
+				Message:    item.Message,
+				CheckedAt:  now,
+				ExpiresAt:  now.Add(moduleHealthTTL(item.Status, overrideTTL)),
+			})
+		}
+		if err := s.store.SaveModuleHealthCache(cacheEntries); err != nil {
+			return nil, err
+		}
+	}
+
+	out := make([]walker.ModuleHealth, 0, len(all))
+	for _, mod := range all {
+		if item, ok := healthByName[mod.Name()]; ok {
+			out = append(out, item)
+		}
+	}
+	return out, nil
+}
+
 func (s *Service) publishEvent(event *ScanEvent) {
 	if event.Time.IsZero() {
 		event.Time = time.Now().UTC()
 	}
-	if err := s.store.AppendEvent(event); err == nil {
-		s.broker.Publish(*event)
+	if err := s.store.AppendEvent(event); err != nil {
+		slog.Warn("persisting scan event", "scan_id", event.ScanID, "type", event.Type, "err", err)
+		return
 	}
+	s.broker.Publish(*event)
 }
 
 func (s *Service) setActive(scanID string, cancel context.CancelFunc) {

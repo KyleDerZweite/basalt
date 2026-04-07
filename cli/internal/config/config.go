@@ -4,7 +4,10 @@ package config
 
 import (
 	"bufio"
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
+	"sort"
 	"strings"
 )
 
@@ -60,4 +63,29 @@ func Load(path string) (*Config, error) {
 // Get returns the value for a key, or empty string if not set.
 func (c *Config) Get(key string) string {
 	return c.values[key]
+}
+
+// Fingerprint returns a stable hash of the loaded config values.
+func (c *Config) Fingerprint() string {
+	if c == nil || len(c.values) == 0 {
+		sum := sha256.Sum256(nil)
+		return hex.EncodeToString(sum[:])
+	}
+
+	keys := make([]string, 0, len(c.values))
+	for key := range c.values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	var builder strings.Builder
+	for _, key := range keys {
+		builder.WriteString(key)
+		builder.WriteByte('=')
+		builder.WriteString(c.values[key])
+		builder.WriteByte('\n')
+	}
+
+	sum := sha256.Sum256([]byte(builder.String()))
+	return hex.EncodeToString(sum[:])
 }

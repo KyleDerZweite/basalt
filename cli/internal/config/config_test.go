@@ -81,3 +81,29 @@ func TestLoadQuotedValues(t *testing.T) {
 		t.Errorf("KEY2 = %q, want %q", got, "single quoted")
 	}
 }
+
+func TestFingerprintStableAcrossOrdering(t *testing.T) {
+	dir := t.TempDir()
+	pathA := filepath.Join(dir, "config-a")
+	pathB := filepath.Join(dir, "config-b")
+
+	if err := os.WriteFile(pathA, []byte("B=2\nA=1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(pathB, []byte("A=1\nB=2\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfgA, err := Load(pathA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfgB, err := Load(pathB)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if cfgA.Fingerprint() != cfgB.Fingerprint() {
+		t.Fatalf("expected stable fingerprints, got %q and %q", cfgA.Fingerprint(), cfgB.Fingerprint())
+	}
+}

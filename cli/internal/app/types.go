@@ -52,14 +52,17 @@ type TargetAlias struct {
 
 // ScanRequest describes a scan job request.
 type ScanRequest struct {
-	Seeds           []graph.Seed `json:"seeds"`
-	Depth           int          `json:"depth"`
-	Concurrency     int          `json:"concurrency"`
-	TimeoutSeconds  int          `json:"timeout_seconds"`
-	ConfigPath      string       `json:"config_path,omitempty"`
-	StrictMode      bool         `json:"strict_mode,omitempty"`
-	DisabledModules []string     `json:"disabled_modules,omitempty"`
-	TargetRef       string       `json:"target_ref,omitempty"`
+	Seeds                  []graph.Seed `json:"seeds"`
+	Depth                  int          `json:"depth"`
+	Concurrency            int          `json:"concurrency"`
+	TimeoutSeconds         int          `json:"timeout_seconds"`
+	ConfigPath             string       `json:"config_path,omitempty"`
+	StrictMode             bool         `json:"strict_mode,omitempty"`
+	DisabledModules        []string     `json:"disabled_modules,omitempty"`
+	TargetRef              string       `json:"target_ref,omitempty"`
+	RefreshModuleHealth    bool         `json:"refresh_module_health,omitempty"`
+	ClearModuleHealthCache bool         `json:"clear_module_health_cache,omitempty"`
+	ModuleHealthTTLSeconds int          `json:"module_health_ttl_seconds,omitempty"`
 }
 
 // ModuleStatus is the JSON-safe health view for a module.

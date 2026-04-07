@@ -5,6 +5,7 @@ package app
 import (
 	"database/sql"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -38,6 +39,19 @@ func TestStoreSettingsRoundTrip(t *testing.T) {
 	}
 	if got.LegalAcceptedAt == nil || !got.LegalAcceptedAt.Equal(now) {
 		t.Fatalf("unexpected accepted timestamp: got %s want %s", got.LegalAcceptedAt, now)
+	}
+}
+
+func TestStoreEnablesForeignKeys(t *testing.T) {
+	store := testStore(t)
+	defer store.Close()
+
+	var enabled int
+	if err := store.db.QueryRow(`PRAGMA foreign_keys;`).Scan(&enabled); err != nil {
+		t.Fatal(err)
+	}
+	if enabled != 1 {
+		t.Fatalf("expected foreign_keys pragma to be enabled, got %d", enabled)
 	}
 }
 
@@ -168,6 +182,45 @@ func TestStoreTargetRoundTrip(t *testing.T) {
 	}
 }
 
+func TestStoreDeleteTargetCascadesAliases(t *testing.T) {
+	store := testStore(t)
+	defer store.Close()
+
+	now := time.Now().UTC().Round(time.Second)
+	target := &Target{
+		ID:          "target-1",
+		Slug:        "kyle",
+		DisplayName: "Kyle",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := store.CreateTarget(target); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AddTargetAlias(&TargetAlias{
+		ID:        "alias-1",
+		TargetID:  target.ID,
+		SeedType:  graph.NodeTypeUsername,
+		SeedValue: "kylederzweite",
+		IsPrimary: true,
+		CreatedAt: now,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.DeleteTarget(target.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	var count int
+	if err := store.db.QueryRow(`SELECT COUNT(*) FROM target_aliases WHERE target_id = ?`, target.ID).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatalf("expected aliases to be deleted via cascade, got %d", count)
+	}
+}
+
 func TestStoreMigratesLegacyScansTable(t *testing.T) {
 	dir := t.TempDir()
 	db, err := sql.Open("sqlite", filepath.Join(dir, "basalt.db"))
@@ -239,6 +292,99 @@ func TestStoreMigratesLegacyScansTable(t *testing.T) {
 	}
 	if insightsCount != 1 {
 		t.Fatalf("expected insights_json column to be added, got %d", insightsCount)
+	}
+}
+
+func TestListScansSkipsGraphDecoding(t *testing.T) {
+	store := testStore(t)
+	defer store.Close()
+
+	startedAt := time.Now().UTC().Round(time.Second)
+	if _, err := store.db.Exec(`
+		INSERT INTO scans (
+			id, target_id, status, started_at, completed_at, updated_at, seeds_json, options_json,
+			health_json, insights_json, graph_json, node_count, edge_count, error_message
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`,
+		"scan-1",
+		"",
+		string(ScanStatusCompleted),
+		startedAt.Format(time.RFC3339Nano),
+		nil,
+		startedAt.Format(time.RFC3339Nano),
+		`[]`,
+		`{"depth":2,"concurrency":5,"timeout_seconds":10}`,
+		`[]`,
+		nil,
+		`{not-valid-json`,
+		3,
+		2,
+		"",
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	scans, err := store.ListScans(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(scans) != 1 {
+		t.Fatalf("expected one scan summary, got %d", len(scans))
+	}
+	if scans[0].Graph != nil {
+		t.Fatal("expected list response to omit graph payload")
+	}
+}
+
+func TestAppendEventSerializesSequenceAllocation(t *testing.T) {
+	store := testStore(t)
+	defer store.Close()
+
+	startedAt := time.Now().UTC().Round(time.Second)
+	record := &ScanRecord{
+		ID:        "scan-1",
+		Status:    ScanStatusRunning,
+		StartedAt: startedAt,
+		UpdatedAt: startedAt,
+		Seeds:     []graph.Seed{{Type: graph.NodeTypeUsername, Value: "kyle"}},
+		Options: ScanRequest{
+			Depth:          2,
+			Concurrency:    5,
+			TimeoutSeconds: 10,
+		},
+	}
+	if err := store.CreateScan(record); err != nil {
+		t.Fatal(err)
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			if err := store.AppendEvent(&ScanEvent{
+				ScanID:  record.ID,
+				Time:    startedAt.Add(time.Duration(i) * time.Millisecond),
+				Type:    "tick",
+				Message: "event",
+			}); err != nil {
+				t.Errorf("append event %d: %v", i, err)
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	events, err := store.ListEvents(record.ID, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 32 {
+		t.Fatalf("expected 32 events, got %d", len(events))
+	}
+	for i, event := range events {
+		if want := int64(i + 1); event.Sequence != want {
+			t.Fatalf("unexpected sequence at index %d: got %d want %d", i, event.Sequence, want)
+		}
 	}
 }
 

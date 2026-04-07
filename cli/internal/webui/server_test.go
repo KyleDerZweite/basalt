@@ -93,7 +93,10 @@ func TestAssetsAreServed(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("GET /assets/app.js returned %d: %s", rec.Code, rec.Body.String())
 	}
-	if !strings.Contains(rec.Body.String(), "reactflow") && !strings.Contains(rec.Body.String(), "Investigation Workspace") {
+	if got := rec.Header().Get("Content-Type"); !strings.Contains(got, "javascript") && !strings.Contains(got, "text/plain") {
+		t.Fatalf("expected JavaScript content type, got %q", got)
+	}
+	if !strings.Contains(rec.Body.String(), "createRoot") && !strings.Contains(rec.Body.String(), "modulepreload") {
 		t.Fatalf("expected JavaScript asset, got %s", rec.Body.String())
 	}
 }

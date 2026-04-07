@@ -27,3 +27,7 @@ func DefaultConfigPath(dataDir string) string {
 func defaultDBPath(dataDir string) string {
 	return filepath.Join(dataDir, "basalt.db")
 }
+
+func defaultDBDSN(dataDir string) string {
+	return defaultDBPath(dataDir) + "?_pragma=foreign_keys(1)"
+}

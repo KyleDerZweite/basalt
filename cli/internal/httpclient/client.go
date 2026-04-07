@@ -95,9 +95,9 @@ func WithDNSCache(cache *DNSCache) Option {
 }
 
 // defaultTransport returns a tuned HTTP transport with proper connection pooling.
-func defaultTransport(concurrency int) *http.Transport {
+func defaultTransport(concurrency int, connectTimeout time.Duration) *http.Transport {
 	dialer := &net.Dialer{
-		Timeout:   defaultConnectTimeout,
+		Timeout:   connectTimeout,
 		KeepAlive: 30 * time.Second,
 	}
 	return &http.Transport{
@@ -123,7 +123,7 @@ func New(opts ...Option) *Client {
 				}
 				return nil
 			},
-			Transport: defaultTransport(defaultMaxConnsPerHost),
+			Transport: defaultTransport(defaultMaxConnsPerHost, defaultConnectTimeout),
 		},
 		userAgent:      defaultUserAgent,
 		maxRetries:     defaultMaxRetries,
@@ -132,6 +132,16 @@ func New(opts ...Option) *Client {
 	}
 	for _, opt := range opts {
 		opt(c)
+	}
+	if t, ok := c.http.Transport.(*http.Transport); ok {
+		if c.dnsCache != nil {
+			t.DialContext = c.dnsCache.DialContext
+		} else {
+			t.DialContext = (&net.Dialer{
+				Timeout:   c.connectTimeout,
+				KeepAlive: 30 * time.Second,
+			}).DialContext
+		}
 	}
 	return c
 }

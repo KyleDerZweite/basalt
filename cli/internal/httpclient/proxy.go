@@ -68,7 +68,7 @@ func LoadProxyFile(path string) ([]string, error) {
 
 // Transport returns an http.RoundTripper that rotates through proxies.
 func (p *ProxyPool) Transport() http.RoundTripper {
-	t := defaultTransport(defaultMaxConnsPerHost)
+	t := defaultTransport(defaultMaxConnsPerHost, defaultConnectTimeout)
 	t.Proxy = func(req *http.Request) (*url.URL, error) {
 		return p.next(), nil
 	}

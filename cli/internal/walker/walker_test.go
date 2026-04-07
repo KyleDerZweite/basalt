@@ -237,6 +237,60 @@ func TestWalkerDegradesPenalizesConfidence(t *testing.T) {
 	}
 }
 
+func TestWalkerDispatchesNodeThatBecomesPivotOnMerge(t *testing.T) {
+	g := graph.New()
+	reg := modules.NewRegistry()
+
+	seedOnlyNonPivot := &fakeModule{
+		name:    "first",
+		handles: []string{"source"},
+		health:  modules.Healthy,
+		extractFn: func(_ context.Context, _ *graph.Node) ([]*graph.Node, []*graph.Edge, error) {
+			n := graph.NewNode(graph.NodeTypeUsername, "shared-user", "first")
+			n.Confidence = 0.60
+			return []*graph.Node{n}, nil, nil
+		},
+	}
+	seedOnlyPivot := &fakeModule{
+		name:    "second",
+		handles: []string{"source"},
+		health:  modules.Healthy,
+		extractFn: func(_ context.Context, _ *graph.Node) ([]*graph.Node, []*graph.Edge, error) {
+			n := graph.NewNode(graph.NodeTypeUsername, "shared-user", "second")
+			n.Pivot = true
+			n.Confidence = 0.90
+			return []*graph.Node{n}, nil, nil
+		},
+	}
+	usernameObserver := &fakeModule{
+		name:    "observer",
+		handles: []string{"username"},
+		health:  modules.Healthy,
+	}
+
+	reg.Register(seedOnlyNonPivot)
+	reg.Register(seedOnlyPivot)
+	reg.Register(usernameObserver)
+
+	w := New(g, reg, WithMaxDepth(2), WithConcurrency(2), WithTimeout(5*time.Second))
+	w.Run(context.Background(), []graph.Seed{{Type: "source", Value: "root"}})
+
+	if got := usernameObserver.calls.Load(); got != 1 {
+		t.Fatalf("expected observer to run once after node becomes pivotable, got %d", got)
+	}
+
+	node := g.GetNode("username:shared-user")
+	if node == nil {
+		t.Fatal("expected merged username node to exist")
+	}
+	if !node.Pivot {
+		t.Fatal("expected merged username node to become pivotable")
+	}
+	if node.Confidence != 0.90 {
+		t.Fatalf("expected merged confidence 0.90, got %.2f", node.Confidence)
+	}
+}
+
 // TestWalkerGracefulShutdown verifies that cancelling the context causes
 // Run to return promptly even if a module is slow.
 func TestWalkerGracefulShutdown(t *testing.T) {

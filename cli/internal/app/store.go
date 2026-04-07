@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -19,7 +21,8 @@ import (
 
 // Store persists scans, events, and local settings.
 type Store struct {
-	db *sql.DB
+	db      *sql.DB
+	eventMu sync.Mutex
 }
 
 func openStore(dataDir string) (*Store, error) {
@@ -28,7 +31,7 @@ func openStore(dataDir string) (*Store, error) {
 	}
 
 	dbPath := defaultDBPath(dataDir)
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := sql.Open("sqlite", defaultDBDSN(dataDir))
 	if err != nil {
 		return nil, fmt.Errorf("opening sqlite database %s: %w", dbPath, err)
 	}
@@ -86,6 +89,16 @@ func (s *Store) migrate() error {
 			data_json TEXT NOT NULL,
 			updated_at TEXT NOT NULL
 		);`,
+		`CREATE TABLE IF NOT EXISTS module_health_cache (
+			module_name TEXT NOT NULL,
+			basalt_version TEXT NOT NULL,
+			config_hash TEXT NOT NULL,
+			status TEXT NOT NULL,
+			message TEXT NOT NULL DEFAULT '',
+			checked_at TEXT NOT NULL,
+			expires_at TEXT NOT NULL,
+			PRIMARY KEY (module_name, basalt_version, config_hash)
+		);`,
 		`CREATE TABLE IF NOT EXISTS targets (
 			id TEXT PRIMARY KEY,
 			slug TEXT NOT NULL UNIQUE,
@@ -142,6 +155,99 @@ func (s *Store) GetSettings() (Settings, error) {
 		return Settings{}, fmt.Errorf("decoding settings: %w", err)
 	}
 	return normalizeSettings(settings), nil
+}
+
+func (s *Store) LoadModuleHealthCache(version, configHash string, moduleNames []string, now time.Time) (map[string]ModuleHealthCacheEntry, error) {
+	if len(moduleNames) == 0 {
+		return map[string]ModuleHealthCacheEntry{}, nil
+	}
+
+	placeholders := strings.TrimRight(strings.Repeat("?,", len(moduleNames)), ",")
+	args := make([]any, 0, len(moduleNames)+3)
+	args = append(args, version, configHash, now.UTC().Format(time.RFC3339Nano))
+	for _, name := range moduleNames {
+		args = append(args, name)
+	}
+
+	rows, err := s.db.Query(fmt.Sprintf(`
+		SELECT module_name, basalt_version, config_hash, status, message, checked_at, expires_at
+		FROM module_health_cache
+		WHERE basalt_version = ? AND config_hash = ? AND expires_at > ? AND module_name IN (%s)
+	`, placeholders), args...)
+	if err != nil {
+		return nil, fmt.Errorf("listing module health cache: %w", err)
+	}
+	defer rows.Close()
+
+	out := make(map[string]ModuleHealthCacheEntry, len(moduleNames))
+	for rows.Next() {
+		var entry ModuleHealthCacheEntry
+		var rawChecked string
+		var rawExpires string
+		if err := rows.Scan(&entry.ModuleName, &entry.Version, &entry.ConfigHash, &entry.Status, &entry.Message, &rawChecked, &rawExpires); err != nil {
+			return nil, fmt.Errorf("scanning module health cache: %w", err)
+		}
+		entry.CheckedAt, err = time.Parse(time.RFC3339Nano, rawChecked)
+		if err != nil {
+			return nil, fmt.Errorf("parsing cached module checked_at: %w", err)
+		}
+		entry.ExpiresAt, err = time.Parse(time.RFC3339Nano, rawExpires)
+		if err != nil {
+			return nil, fmt.Errorf("parsing cached module expires_at: %w", err)
+		}
+		out[entry.ModuleName] = entry
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating module health cache: %w", err)
+	}
+	return out, nil
+}
+
+func (s *Store) SaveModuleHealthCache(entries []ModuleHealthCacheEntry) error {
+	if len(entries) == 0 {
+		return nil
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("starting module health cache transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	for _, entry := range entries {
+		if _, err := tx.Exec(`
+			INSERT INTO module_health_cache (
+				module_name, basalt_version, config_hash, status, message, checked_at, expires_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT(module_name, basalt_version, config_hash) DO UPDATE SET
+				status = excluded.status,
+				message = excluded.message,
+				checked_at = excluded.checked_at,
+				expires_at = excluded.expires_at
+		`,
+			entry.ModuleName,
+			entry.Version,
+			entry.ConfigHash,
+			entry.Status,
+			entry.Message,
+			entry.CheckedAt.UTC().Format(time.RFC3339Nano),
+			entry.ExpiresAt.UTC().Format(time.RFC3339Nano),
+		); err != nil {
+			return fmt.Errorf("saving module health cache: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing module health cache transaction: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) ClearModuleHealthCache() error {
+	if _, err := s.db.Exec(`DELETE FROM module_health_cache`); err != nil {
+		return fmt.Errorf("clearing module health cache: %w", err)
+	}
+	return nil
 }
 
 func (s *Store) SaveSettings(settings Settings) error {
@@ -296,7 +402,7 @@ func (s *Store) ListScans(limit int) ([]*ScanRecord, error) {
 	}
 	rows, err := s.db.Query(`
 		SELECT id, target_id, status, started_at, completed_at, updated_at, seeds_json, options_json,
-		       health_json, insights_json, graph_json, node_count, edge_count, error_message
+		       health_json, insights_json, node_count, edge_count, error_message
 		FROM scans
 		ORDER BY started_at DESC
 		LIMIT ?
@@ -308,11 +414,10 @@ func (s *Store) ListScans(limit int) ([]*ScanRecord, error) {
 
 	var out []*ScanRecord
 	for rows.Next() {
-		record, err := scanFromRow(rows.Scan)
+		record, err := scanSummaryFromRow(rows.Scan)
 		if err != nil {
 			return nil, err
 		}
-		record.Graph = nil
 		out = append(out, record)
 	}
 	if err := rows.Err(); err != nil {
@@ -331,7 +436,7 @@ func (s *Store) ListScansByTarget(targetID string, limit int) ([]*ScanRecord, er
 	}
 	rows, err := s.db.Query(`
 		SELECT id, target_id, status, started_at, completed_at, updated_at, seeds_json, options_json,
-		       health_json, insights_json, graph_json, node_count, edge_count, error_message
+		       health_json, insights_json, node_count, edge_count, error_message
 		FROM scans
 		WHERE target_id = ?
 		ORDER BY started_at DESC
@@ -344,11 +449,10 @@ func (s *Store) ListScansByTarget(targetID string, limit int) ([]*ScanRecord, er
 
 	var out []*ScanRecord
 	for rows.Next() {
-		record, err := scanFromRow(rows.Scan)
+		record, err := scanSummaryFromRow(rows.Scan)
 		if err != nil {
 			return nil, err
 		}
-		record.Graph = nil
 		out = append(out, record)
 	}
 	if err := rows.Err(); err != nil {
@@ -434,14 +538,20 @@ func (s *Store) ListTargets() ([]*Target, error) {
 		if err != nil {
 			return nil, err
 		}
-		target.Aliases, err = s.listTargetAliases(target.ID)
-		if err != nil {
-			return nil, err
-		}
 		out = append(out, target)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterating targets: %w", err)
+	}
+	aliasesByTarget, err := s.listAllTargetAliases()
+	if err != nil {
+		return nil, err
+	}
+	for _, target := range out {
+		target.Aliases = aliasesByTarget[target.ID]
+		if target.Aliases == nil {
+			target.Aliases = []TargetAlias{}
+		}
 	}
 	if out == nil {
 		out = []*Target{}
@@ -522,6 +632,9 @@ func (s *Store) listTargetAliases(targetID string) ([]TargetAlias, error) {
 }
 
 func (s *Store) AppendEvent(event *ScanEvent) error {
+	s.eventMu.Lock()
+	defer s.eventMu.Unlock()
+
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("starting event transaction: %w", err)
@@ -680,6 +793,71 @@ func scanFromRow(scan func(dest ...any) error) (*ScanRecord, error) {
 	return &record, nil
 }
 
+func scanSummaryFromRow(scan func(dest ...any) error) (*ScanRecord, error) {
+	var record ScanRecord
+	var targetID string
+	var rawStarted string
+	var rawCompleted sql.NullString
+	var rawUpdated string
+	var seedsJSON string
+	var optionsJSON string
+	var healthJSON string
+	var insightsJSON sql.NullString
+
+	err := scan(
+		&record.ID,
+		&targetID,
+		&record.Status,
+		&rawStarted,
+		&rawCompleted,
+		&rawUpdated,
+		&seedsJSON,
+		&optionsJSON,
+		&healthJSON,
+		&insightsJSON,
+		&record.NodeCount,
+		&record.EdgeCount,
+		&record.ErrorMessage,
+	)
+	if err != nil {
+		return nil, err
+	}
+	record.TargetID = targetID
+
+	record.StartedAt, err = time.Parse(time.RFC3339Nano, rawStarted)
+	if err != nil {
+		return nil, fmt.Errorf("parsing started_at: %w", err)
+	}
+	record.UpdatedAt, err = time.Parse(time.RFC3339Nano, rawUpdated)
+	if err != nil {
+		return nil, fmt.Errorf("parsing updated_at: %w", err)
+	}
+	if rawCompleted.Valid && rawCompleted.String != "" {
+		completedAt, err := time.Parse(time.RFC3339Nano, rawCompleted.String)
+		if err != nil {
+			return nil, fmt.Errorf("parsing completed_at: %w", err)
+		}
+		record.CompletedAt = &completedAt
+	}
+	if err := json.Unmarshal([]byte(seedsJSON), &record.Seeds); err != nil {
+		return nil, fmt.Errorf("decoding seeds: %w", err)
+	}
+	if err := json.Unmarshal([]byte(optionsJSON), &record.Options); err != nil {
+		return nil, fmt.Errorf("decoding scan options: %w", err)
+	}
+	if err := json.Unmarshal([]byte(healthJSON), &record.Health); err != nil {
+		return nil, fmt.Errorf("decoding module health: %w", err)
+	}
+	if insightsJSON.Valid && insightsJSON.String != "" {
+		var insights ScanInsights
+		if err := json.Unmarshal([]byte(insightsJSON.String), &insights); err != nil {
+			return nil, fmt.Errorf("decoding scan insights: %w", err)
+		}
+		record.Insights = &insights
+	}
+	return &record, nil
+}
+
 type persistedGraph struct {
 	Meta  graph.Meta    `json:"meta"`
 	Nodes []*graph.Node `json:"nodes"`
@@ -701,6 +879,63 @@ func decodeGraph(data []byte) (*graph.Graph, error) {
 		out.AddEdge(edge)
 	}
 	out.RestoreStats(persisted.Meta.Stats, len(persisted.Edges))
+	return out, nil
+}
+
+func (s *Store) listAllTargetAliases() (map[string][]TargetAlias, error) {
+	rows, err := s.db.Query(`
+		SELECT id, target_id, seed_type, seed_value, label, is_primary, created_at
+		FROM target_aliases
+		ORDER BY target_id ASC, is_primary DESC, created_at ASC, seed_type ASC, seed_value ASC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("listing target aliases: %w", err)
+	}
+	defer rows.Close()
+
+	out := make(map[string][]TargetAlias)
+	for rows.Next() {
+		var alias TargetAlias
+		var rawCreated string
+		var isPrimary int
+		if err := rows.Scan(&alias.ID, &alias.TargetID, &alias.SeedType, &alias.SeedValue, &alias.Label, &isPrimary, &rawCreated); err != nil {
+			return nil, fmt.Errorf("scanning target alias: %w", err)
+		}
+		alias.IsPrimary = isPrimary == 1
+		alias.CreatedAt, err = time.Parse(time.RFC3339Nano, rawCreated)
+		if err != nil {
+			return nil, fmt.Errorf("parsing alias created_at: %w", err)
+		}
+		out[alias.TargetID] = append(out[alias.TargetID], alias)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating target aliases: %w", err)
+	}
+	for targetID, aliases := range out {
+		slices.SortStableFunc(aliases, func(a, b TargetAlias) int {
+			switch {
+			case a.IsPrimary && !b.IsPrimary:
+				return -1
+			case !a.IsPrimary && b.IsPrimary:
+				return 1
+			case a.CreatedAt.Before(b.CreatedAt):
+				return -1
+			case a.CreatedAt.After(b.CreatedAt):
+				return 1
+			case a.SeedType < b.SeedType:
+				return -1
+			case a.SeedType > b.SeedType:
+				return 1
+			case a.SeedValue < b.SeedValue:
+				return -1
+			case a.SeedValue > b.SeedValue:
+				return 1
+			default:
+				return 0
+			}
+		})
+		out[targetID] = aliases
+	}
 	return out, nil
 }
 

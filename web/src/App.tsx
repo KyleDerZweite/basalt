@@ -71,16 +71,36 @@ export function App() {
     }
   }, []);
 
+  const refreshActivity = useCallback(async () => {
+    try {
+      const [boot, nextSettings, nextTargets, nextScans] = await Promise.all([
+        api<Bootstrap>("/app/bootstrap"),
+        api<Settings>("/api/settings"),
+        api<{ targets: Target[] }>("/api/targets"),
+        api<{ scans: ScanRecord[] }>("/api/scans"),
+      ]);
+
+      startTransition(() => {
+        setBootstrap(boot);
+        setSettings(nextSettings);
+        setTargets(nextTargets.targets);
+        setScans(nextScans.scans);
+        setError("");
+      });
+    } catch (reason) {
+      setError(asMessage(reason));
+    }
+  }, []);
+
   useEffect(() => {
     void refreshHome();
-    
-    // Global poll for status updates every 10 seconds
+
     const timer = setInterval(() => {
-      void refreshHome();
+      void refreshActivity();
     }, 10000);
-    
+
     return () => clearInterval(timer);
-  }, [refreshHome]);
+  }, [refreshActivity, refreshHome]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;

@@ -93,10 +93,13 @@ func (s *Server) handleModuleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req := app.ScanRequest{
-		Depth:          parseInt(r.URL.Query().Get("depth"), 2),
-		Concurrency:    parseInt(r.URL.Query().Get("concurrency"), 5),
-		TimeoutSeconds: parseInt(r.URL.Query().Get("timeout"), 10),
-		StrictMode:     r.URL.Query().Get("strict") == "1" || r.URL.Query().Get("strict") == "true",
+		Depth:                  parseInt(r.URL.Query().Get("depth"), 2),
+		Concurrency:            parseInt(r.URL.Query().Get("concurrency"), 5),
+		TimeoutSeconds:         parseInt(r.URL.Query().Get("timeout"), 10),
+		StrictMode:             r.URL.Query().Get("strict") == "1" || r.URL.Query().Get("strict") == "true",
+		RefreshModuleHealth:    r.URL.Query().Get("refresh") == "1" || r.URL.Query().Get("refresh") == "true",
+		ClearModuleHealthCache: r.URL.Query().Get("clear") == "1" || r.URL.Query().Get("clear") == "true",
+		ModuleHealthTTLSeconds: parseDurationSeconds(r.URL.Query().Get("ttl"), 0),
 	}
 	health, err := s.service.ModuleHealth(r.Context(), req)
 	if err != nil {
@@ -557,4 +560,18 @@ func parseInt(value string, fallback int) int {
 		return fallback
 	}
 	return out
+}
+
+func parseDurationSeconds(value string, fallback int) int {
+	if value == "" {
+		return fallback
+	}
+	if seconds, err := strconv.Atoi(value); err == nil {
+		return seconds
+	}
+	duration, err := time.ParseDuration(value)
+	if err != nil {
+		return fallback
+	}
+	return int(duration / time.Second)
 }

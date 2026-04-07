@@ -248,26 +248,27 @@ func (w *Walker) dispatch(ctx context.Context, node *graph.Node) {
 					n.Confidence *= 0.5
 				}
 				n.Wave = node.Wave + 1
-				if w.graph.AddNode(n) {
+				mutation := w.graph.UpsertNode(n)
+				if mutation.Added {
 					w.graph.IncrNodesFound()
 					discoveredNodes++
 					w.emit(Event{
 						Type:   "node_discovered",
 						Module: mod.Name(),
-						NodeID: n.ID,
+						NodeID: mutation.Node.ID,
 						Data: map[string]interface{}{
-							"node_type":   n.Type,
-							"label":       n.Label,
-							"confidence":  n.Confidence,
-							"wave":        n.Wave,
+							"node_type":   mutation.Node.Type,
+							"label":       mutation.Node.Label,
+							"confidence":  mutation.Node.Confidence,
+							"wave":        mutation.Node.Wave,
 							"source_node": node.ID,
 						},
 					})
+				}
 
-					// Pivot: dispatch new pivotable nodes within depth limit.
-					if n.Pivot && n.Wave <= w.maxDepth {
-						w.dispatch(ctx, n)
-					}
+				// Pivot: dispatch newly discovered nodes and nodes that become pivotable later.
+				if (mutation.Added || mutation.BecamePivot) && mutation.Node.Pivot && mutation.Node.Wave <= w.maxDepth {
+					w.dispatch(ctx, mutation.Node)
 				}
 			}
 			discoveredEdges := 0
