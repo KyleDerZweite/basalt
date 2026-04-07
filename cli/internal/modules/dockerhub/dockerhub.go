@@ -89,6 +89,11 @@ func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclie
 		nameNode.Pivot = false
 		nodes = append(nodes, nameNode)
 		edges = append(edges, graph.NewEdge(0, account.ID, nameNode.ID, graph.EdgeTypeLinkedTo, "dockerhub"))
+
+		if inferredUsername := modules.InferUsernameFromDisplayName(profile.FullName, username, "dockerhub"); inferredUsername != nil {
+			nodes = append(nodes, inferredUsername)
+			edges = append(edges, graph.NewEdge(0, account.ID, inferredUsername.ID, graph.EdgeTypeHasUsername, "dockerhub"))
+		}
 	}
 
 	return nodes, edges, nil

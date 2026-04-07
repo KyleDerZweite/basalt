@@ -130,6 +130,58 @@ func TestExtractNotFound(t *testing.T) {
 	}
 }
 
+func TestExtractInfersUsernameFromSingleTokenFullName(t *testing.T) {
+	profile := map[string]interface{}{
+		"id":          "abc123",
+		"username":    "kylederzweite",
+		"full_name":   "VispLP",
+		"profile_url": "https://hub.docker.com/u/kylederzweite",
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(profile)
+	}))
+	defer srv.Close()
+
+	m := New()
+	m.baseURL = srv.URL
+
+	node := graph.NewNode("username", "kylederzweite", "seed")
+	client := httpclient.New()
+
+	nodes, edges, err := m.Extract(context.Background(), node, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(nodes) != 3 {
+		t.Fatalf("expected 3 nodes (account + full_name + inferred username), got %d", len(nodes))
+	}
+	if len(edges) != 3 {
+		t.Fatalf("expected 3 edges, got %d", len(edges))
+	}
+
+	inferred := nodes[2]
+	if inferred.Type != graph.NodeTypeUsername {
+		t.Fatalf("expected inferred username node, got %s", inferred.Type)
+	}
+	if inferred.Label != "VispLP" {
+		t.Fatalf("expected inferred username VispLP, got %q", inferred.Label)
+	}
+	if !inferred.Pivot {
+		t.Fatal("expected inferred username to be pivotable")
+	}
+	if inferred.Confidence != 0.65 {
+		t.Fatalf("expected inferred confidence 0.65, got %f", inferred.Confidence)
+	}
+	if inferred.Properties["inferred_from"] != graph.NodeTypeFullName {
+		t.Fatalf("expected inferred_from full_name, got %#v", inferred.Properties["inferred_from"])
+	}
+	if edges[2].Type != graph.EdgeTypeHasUsername {
+		t.Fatalf("expected inferred edge type has_username, got %s", edges[2].Type)
+	}
+}
+
 func TestVerifyHealthy(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
