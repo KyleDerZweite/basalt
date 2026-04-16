@@ -107,6 +107,20 @@ go vet ./...
 go test ./...
 ```
 
+## Dependabot Auto-Merge
+
+This repo includes GitHub Actions that:
+
+- run Go and web CI on every pull request
+- enable native GitHub auto-merge for non-draft Dependabot PRs when they are conflict-free
+
+Required GitHub repo settings:
+
+- enable `Allow auto-merge` under `Settings -> General -> Pull Requests`
+- add branch protection on your default branch and require the `CLI` and `Web` status checks before merging
+
+With those settings in place, Dependabot PRs will queue for squash-merge automatically and only land after the required checks pass.
+
 ## Legal
 
 For self-lookup and authorized research only.
