@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@chenglou/pretext':
-        specifier: ^0.0.4
-        version: 0.0.4
+        specifier: ^0.0.5
+        version: 0.0.5
       '@types/cytoscape':
         specifier: ^3.21.9
         version: 3.31.0
@@ -48,8 +48,8 @@ importers:
 
 packages:
 
-  '@chenglou/pretext@0.0.4':
-    resolution: {integrity: sha512-FnPAFMid1/p1j2V2gRPUVBarGUIb2PhkkC9YNnTOfPtTDgHKh8siO8PP9pCxpFfYlcodWPJpE1UbSHGQqt8pQQ==}
+  '@chenglou/pretext@0.0.5':
+    resolution: {integrity: sha512-A8GZN10REdFGsyuiUgLV8jjPDDFMg5GmgxGWV0I3igxBOnzj+jgz2VMmVD7g+SFyoctfeqHFxbNatKSzVRWtRg==}
 
   '@emnapi/core@1.9.2':
     resolution: {integrity: sha512-UC+ZhH3XtczQYfOlu3lNEkdW/p4dsJ1r/bP7H8+rhao3TTTMO1ATq/4DdIi23XuGoFY+Cz0JmCbdVl0hz9jZcA==}
@@ -420,7 +420,7 @@ packages:
 
 snapshots:
 
-  '@chenglou/pretext@0.0.4': {}
+  '@chenglou/pretext@0.0.5': {}
 
   '@emnapi/core@1.9.2':
     dependencies:

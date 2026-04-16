@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@chenglou/pretext": "^0.0.4",
+    "@chenglou/pretext": "^0.0.5",
     "@types/cytoscape": "^3.21.9",
     "cytoscape": "^3.33.1",
     "lucide-react": "^1.7.0",
