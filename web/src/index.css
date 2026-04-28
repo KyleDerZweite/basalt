@@ -199,7 +199,7 @@ a {
   overflow: hidden;
 }
 
-.page-content > * {
+.page-content>* {
   position: relative;
   z-index: 1;
 }
@@ -463,6 +463,7 @@ a {
 }
 
 @keyframes pulse-dot {
+
   0%,
   100% {
     opacity: 1;
@@ -807,12 +808,12 @@ input[type="checkbox"] {
   transition: transform var(--t-fast), background var(--t-fast);
 }
 
-.toggle input:checked + .toggle-slider {
+.toggle input:checked+.toggle-slider {
   background: var(--accent);
   border-color: var(--accent);
 }
 
-.toggle input:checked + .toggle-slider::before {
+.toggle input:checked+.toggle-slider::before {
   transform: translateX(16px);
   background: #111214;
 }
@@ -1856,7 +1857,7 @@ input[type="checkbox"] {
   gap: 24px;
 }
 
-.targets-layout > :first-child {
+.targets-layout> :first-child {
   flex: 1;
   min-width: 0;
 }
