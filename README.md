@@ -107,19 +107,16 @@ go vet ./...
 go test ./...
 ```
 
-## Dependabot Auto-Merge
+## Dependency updates
 
-This repo includes GitHub Actions that:
+Dependabot opens update PRs for Go modules, npm packages, and GitHub Actions.
 
-- run Go and web CI on every pull request
-- enable native GitHub auto-merge for non-draft Dependabot PRs when they are conflict-free
+This repo does not auto merge those PRs. Each update needs human review and green `CLI` and `Web` checks before merge. The `Vulnerability scan` job also runs on pull requests as an advisory check.
 
-Required GitHub repo settings:
+Recommended branch protection on `main`:
 
-- enable `Allow auto-merge` under `Settings -> General -> Pull Requests`
-- add branch protection on your default branch and require the `CLI` and `Web` status checks before merging
-
-With those settings in place, Dependabot PRs will queue for squash-merge automatically and only land after the required checks pass.
+- require the `CLI` and `Web` status checks before merging
+- require one human review for dependency and non trivial changes
 
 ## Legal
 

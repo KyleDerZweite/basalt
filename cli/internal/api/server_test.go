@@ -69,6 +69,20 @@ func TestStartScanRequiresSeeds(t *testing.T) {
 	}
 }
 
+func TestScanRequestRejectsProxyFileFromAPI(t *testing.T) {
+	handler := testServer(t, Options{})
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/scans", bytes.NewBufferString(`{
+		"seeds":[{"type":"username","value":"test"}],
+		"proxy_file":"/etc/passwd"
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected API proxy_file rejection, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestStartScanWithTargetAliasesOnly(t *testing.T) {
 	harness := testHarness(t, Options{})
 
@@ -152,6 +166,54 @@ func TestServerRejectsForbiddenOriginPreflight(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("expected 403 preflight rejection, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestServerDeniesCrossOriginByDefault(t *testing.T) {
+	handler := testServer(t, Options{})
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/settings", nil)
+	req.Header.Set("Origin", "https://evil.example")
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected default cross-origin rejection, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestServerAllowsSameOriginAndTargetMethods(t *testing.T) {
+	handler := testServer(t, Options{})
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodOptions, "/api/targets/example", nil)
+	req.Header.Set("Origin", "http://example.com")
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected same-origin preflight, got %d: %s", rec.Code, rec.Body.String())
+	}
+	methods := rec.Header().Get("Access-Control-Allow-Methods")
+	if !bytes.Contains([]byte(methods), []byte("PATCH")) || !bytes.Contains([]byte(methods), []byte("DELETE")) {
+		t.Fatalf("expected target methods in preflight, got %q", methods)
+	}
+}
+
+func TestServerLimitsJSONRequestBodies(t *testing.T) {
+	handler := testServer(t, Options{})
+	body := append([]byte(`{"strict_mode":true,"padding":"`), bytes.Repeat([]byte("x"), maxRequestBodySize)...)
+	body = append(body, []byte(`"}`)...)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/settings", bytes.NewReader(body))
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest || !bytes.Contains(rec.Body.Bytes(), []byte("request body too large")) {
+		t.Fatalf("expected bounded-body error, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestWriteSSEIncludesSequenceID(t *testing.T) {
+	rec := httptest.NewRecorder()
+	if err := writeSSE(rec, app.ScanEvent{Sequence: 42, Type: "scan_status"}); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(rec.Body.Bytes(), []byte("id: 42\n")) {
+		t.Fatalf("expected SSE sequence id, got %q", rec.Body.String())
 	}
 }
 

@@ -41,12 +41,25 @@ type Module struct {
 	resolver  Resolver
 }
 
+// Option configures the DNS and certificate transparency module.
+type Option func(*Module)
+
+// WithBaseURL overrides the certificate transparency endpoint.
+func WithBaseURL(baseURL string) Option { return func(m *Module) { m.ctBaseURL = baseURL } }
+
+// WithResolver overrides DNS resolution, primarily for tests.
+func WithResolver(resolver Resolver) Option { return func(m *Module) { m.resolver = resolver } }
+
 // New creates a DNS/CT module with default settings.
-func New() *Module {
-	return &Module{
+func New(opts ...Option) *Module {
+	m := &Module{
 		ctBaseURL: defaultCTBaseURL,
 		resolver:  &netResolver{},
 	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
 }
 
 func (m *Module) Name() string { return "dnsct" }

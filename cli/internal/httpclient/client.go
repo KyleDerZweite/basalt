@@ -12,6 +12,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -43,6 +44,8 @@ type Client struct {
 	retryBase      time.Duration
 	connectTimeout time.Duration
 	dnsCache       *DNSCache
+	limiter        *DomainRateLimiter
+	blockPrivate   bool
 }
 
 // Option configures the Client.
@@ -94,6 +97,17 @@ func WithDNSCache(cache *DNSCache) Option {
 	}
 }
 
+// WithRateLimiter applies a per-domain limiter before every request attempt.
+func WithRateLimiter(limiter *DomainRateLimiter) Option {
+	return func(c *Client) { c.limiter = limiter }
+}
+
+// WithPrivateNetworkBlocking rejects loopback, private, link-local, and other
+// non-public destinations, including redirect targets and resolved addresses.
+func WithPrivateNetworkBlocking() Option {
+	return func(c *Client) { c.blockPrivate = true }
+}
+
 // defaultTransport returns a tuned HTTP transport with proper connection pooling.
 func defaultTransport(concurrency int, connectTimeout time.Duration) *http.Transport {
 	dialer := &net.Dialer{
@@ -133,8 +147,23 @@ func New(opts ...Option) *Client {
 	for _, opt := range opts {
 		opt(c)
 	}
+	previousRedirectCheck := c.http.CheckRedirect
+	c.http.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if c.blockPrivate {
+			if err := validatePublicURL(req.Context(), req.URL, c.dnsCache); err != nil {
+				return err
+			}
+		}
+		return previousRedirectCheck(req, via)
+	}
 	if t, ok := c.http.Transport.(*http.Transport); ok {
-		if c.dnsCache != nil {
+		// A configured proxy resolves destination names in its own network. The
+		// proxy is therefore a trust boundary: local validation still runs for
+		// requests and redirects, but dial-time target validation is only possible
+		// for direct connections.
+		if c.blockPrivate && t.Proxy == nil {
+			t.DialContext = guardedDialContext(c.connectTimeout, c.dnsCache)
+		} else if c.dnsCache != nil {
 			t.DialContext = c.dnsCache.DialContext
 		} else {
 			t.DialContext = (&net.Dialer{
@@ -155,6 +184,15 @@ func (c *Client) Do(ctx context.Context, url string, headers map[string]string) 
 // DoRequest executes an HTTP request with the given method and optional body.
 // It retries on 429, 5xx, and transient network errors with exponential backoff.
 func (c *Client) DoRequest(ctx context.Context, method, url string, body io.Reader, headers map[string]string) (*Response, error) {
+	parsedURL, err := neturl(url)
+	if err != nil {
+		return nil, err
+	}
+	if c.blockPrivate {
+		if err := validatePublicURL(ctx, parsedURL, c.dnsCache); err != nil {
+			return nil, err
+		}
+	}
 	var lastErr error
 
 	// If the body is seekable, we can retry with it. Otherwise, read it once
@@ -169,6 +207,11 @@ func (c *Client) DoRequest(ctx context.Context, method, url string, body io.Read
 	}
 
 	for attempt := 0; attempt <= c.maxRetries; attempt++ {
+		if c.limiter != nil {
+			if err := c.limiter.Wait(ctx, url); err != nil {
+				return nil, fmt.Errorf("rate limiting request: %w", err)
+			}
+		}
 		if attempt > 0 {
 			delay := c.retryBase * time.Duration(math.Pow(2, float64(attempt-1)))
 			slog.Debug("retrying request", "url", url, "attempt", attempt, "delay", delay)
@@ -216,6 +259,14 @@ func (c *Client) DoRequest(ctx context.Context, method, url string, body io.Read
 	}
 
 	return nil, fmt.Errorf("max retries exceeded: %w", lastErr)
+}
+
+func neturl(raw string) (*url.URL, error) {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return nil, fmt.Errorf("parsing request URL: %w", err)
+	}
+	return parsed, nil
 }
 
 // doOnce executes a single HTTP request.

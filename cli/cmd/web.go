@@ -4,6 +4,8 @@ package cmd
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net"
@@ -12,6 +14,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -66,9 +69,18 @@ func runWeb(cmd *cobra.Command, args []string) error {
 	defer listener.Close()
 
 	baseURL := "http://" + listener.Addr().String()
+	authToken, err := newWebSessionToken()
+	if err != nil {
+		return fmt.Errorf("generating web session token: %w", err)
+	}
+	sessionURL := baseURL + "/?session=" + authToken
+	handler, err := webui.NewServer(service, webui.Options{BaseURL: baseURL, AuthToken: authToken})
+	if err != nil {
+		return fmt.Errorf("creating web server: %w", err)
+	}
 	server := &http.Server{
 		Addr:              listener.Addr().String(),
-		Handler:           webui.NewServer(service, webui.Options{BaseURL: baseURL}),
+		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
@@ -77,7 +89,7 @@ func runWeb(cmd *cobra.Command, args []string) error {
 		errCh <- server.Serve(listener)
 	}()
 
-	if err := waitForWebReady(baseURL); err != nil {
+	if err := waitForWebReady(baseURL, authToken); err != nil {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = server.Shutdown(shutdownCtx)
@@ -85,10 +97,11 @@ func runWeb(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Fprintf(os.Stderr, "Basalt web workspace listening on %s\n", baseURL)
+	fmt.Fprintf(os.Stderr, "Session URL: %s\n", sessionURL)
 	fmt.Fprintf(os.Stderr, "Data dir: %s\n", service.DataDir())
 
 	if shouldOpen {
-		if err := openBrowser(baseURL); err != nil {
+		if err := openBrowser(sessionURL); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: could not open browser automatically: %v\n", err)
 		}
 	}
@@ -114,7 +127,7 @@ func runWeb(cmd *cobra.Command, args []string) error {
 	}
 }
 
-func waitForWebReady(baseURL string) error {
+func waitForWebReady(baseURL, authToken string) error {
 	client := &http.Client{}
 	deadline := time.Now().Add(10 * time.Second)
 	paths := []string{"/", "/app/bootstrap", "/api/settings"}
@@ -126,6 +139,9 @@ func waitForWebReady(baseURL string) error {
 			if err != nil {
 				cancel()
 				return err
+			}
+			if strings.HasPrefix(route, "/api/") {
+				req.Header.Set("Authorization", "Bearer "+authToken)
 			}
 			resp, err := client.Do(req)
 			if err != nil {
@@ -149,6 +165,14 @@ func waitForWebReady(baseURL string) error {
 		time.Sleep(150 * time.Millisecond)
 	}
 	return fmt.Errorf("web workspace did not become ready at %s in time", baseURL)
+}
+
+func newWebSessionToken() (string, error) {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(buf), nil
 }
 
 var openBrowser = func(target string) error {

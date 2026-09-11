@@ -3,6 +3,7 @@
 package webui
 
 import (
+	"crypto/subtle"
 	"embed"
 	"encoding/json"
 	"io/fs"
@@ -18,17 +19,23 @@ var distFS embed.FS
 
 // Options configures the browser-facing local product server.
 type Options struct {
-	BaseURL string
+	BaseURL   string
+	AuthToken string
 }
 
+const sessionCookieName = "basalt_web_session"
+
 // NewServer creates the same-origin web UI and API server.
-func NewServer(service *app.Service, opts Options) http.Handler {
+func NewServer(service *app.Service, opts Options) (http.Handler, error) {
 	sub, err := fs.Sub(distFS, "dist")
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	apiHandler := api.NewServer(service, api.Options{})
+	apiHandler := api.NewServer(service, api.Options{
+		AuthToken:      opts.AuthToken,
+		AuthCookieName: sessionCookieName,
+	})
 	fileServer := http.FileServer(http.FS(sub))
 
 	mux := http.NewServeMux()
@@ -50,6 +57,18 @@ func NewServer(service *app.Service, opts Options) http.Handler {
 	}))
 	mux.Handle("/assets/", fileServer)
 	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if token := r.URL.Query().Get("session"); token != "" && opts.AuthToken != "" {
+			if subtle.ConstantTimeCompare([]byte(token), []byte(opts.AuthToken)) != 1 {
+				http.Error(w, "invalid web session", http.StatusUnauthorized)
+				return
+			}
+			http.SetCookie(w, &http.Cookie{
+				Name: sessionCookieName, Value: token, Path: "/", HttpOnly: true,
+				SameSite: http.SameSiteStrictMode,
+			})
+			http.Redirect(w, r, r.URL.Path, http.StatusSeeOther)
+			return
+		}
 		if shouldServeAsset(sub, r.URL.Path) {
 			fileServer.ServeHTTP(w, r)
 			return
@@ -58,7 +77,7 @@ func NewServer(service *app.Service, opts Options) http.Handler {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}))
-	return mux
+	return mux, nil
 }
 
 func shouldServeAsset(fsys fs.FS, requestPath string) bool {

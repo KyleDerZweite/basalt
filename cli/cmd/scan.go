@@ -17,20 +17,22 @@ import (
 )
 
 var (
-	flagUsernames        []string
-	flagEmails           []string
-	flagDomains          []string
-	flagDepth            int
-	flagConcurrency      int
-	flagTimeout          int
-	flagConfigPath       string
-	flagTargetRef        string
-	flagDataDir          string
-	flagExport           []string
-	flagVerbose          bool
-	flagRefreshHealth    bool
-	flagClearHealthCache bool
-	flagModuleHealthTTL  time.Duration
+	flagUsernames         []string
+	flagEmails            []string
+	flagDomains           []string
+	flagDepth             int
+	flagConcurrency       int
+	flagTimeout           int
+	flagConfigPath        string
+	flagTargetRef         string
+	flagDataDir           string
+	flagExport            []string
+	flagVerbose           bool
+	flagRefreshHealth     bool
+	flagClearHealthCache  bool
+	flagModuleHealthTTL   time.Duration
+	flagRequestsPerSecond float64
+	flagProxyFile         string
 )
 
 var scanCmd = &cobra.Command{
@@ -64,6 +66,8 @@ func init() {
 	scanCmd.Flags().BoolVar(&flagRefreshHealth, "refresh-module-health", false, "Bypass cached module health and verify modules now")
 	scanCmd.Flags().BoolVar(&flagClearHealthCache, "clear-module-health-cache", false, "Clear cached module health before verifying")
 	scanCmd.Flags().DurationVar(&flagModuleHealthTTL, "module-health-ttl", 0, "Override cached module health TTL for fresh verification results (for example 90m or 4h)")
+	scanCmd.Flags().Float64Var(&flagRequestsPerSecond, "requests-per-second", 5, "Maximum requests per second per scan")
+	scanCmd.Flags().StringVar(&flagProxyFile, "proxy-file", "", "Path to trusted HTTP, HTTPS, or SOCKS5 proxy URLs, one per line")
 }
 
 func runScan(cmd *cobra.Command, args []string) error {
@@ -77,6 +81,8 @@ func runScan(cmd *cobra.Command, args []string) error {
 		RefreshModuleHealth:    flagRefreshHealth,
 		ClearModuleHealthCache: flagClearHealthCache,
 		ModuleHealthTTLSeconds: int(flagModuleHealthTTL / time.Second),
+		RequestsPerSecond:      flagRequestsPerSecond,
+		ProxyFile:              flagProxyFile,
 	}
 	if len(request.Seeds) == 0 && request.TargetRef == "" {
 		return fmt.Errorf("at least one seed required (-u, -e, or -d), or use --target")
@@ -87,14 +93,6 @@ func runScan(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	defer service.Close()
-
-	health, err := service.ModuleHealth(context.Background(), request)
-	if err != nil {
-		return fmt.Errorf("verifying modules: %w", err)
-	}
-	printHealthSummary(health, flagVerbose)
-	request.RefreshModuleHealth = false
-	request.ClearModuleHealthCache = false
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -113,6 +111,7 @@ func runScan(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	printHealthSummary(record.Health, flagVerbose)
 	if record.Graph == nil {
 		return fmt.Errorf("scan completed without a graph")
 	}

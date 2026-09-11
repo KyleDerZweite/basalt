@@ -46,7 +46,7 @@ Each module lives in its own package under `cli/internal/modules/<name>/` and im
 - `Extract(ctx, node, client) (nodes, edges, error)` -- the actual work
 - `Verify(ctx, client) (HealthStatus, string)` -- health check
 
-Follow the pattern of existing modules (e.g., `twitch`, `github`). Register your module in `cli/cmd/scan.go`.
+Follow the pattern of existing modules (e.g., `twitch`, `github`). Register your module in `cli/internal/app/modules.go`.
 
 Every module must include a `*_test.go` file with at least:
 - `TestCanHandle` -- verifies accepted node types

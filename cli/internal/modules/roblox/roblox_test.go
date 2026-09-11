@@ -68,8 +68,7 @@ func TestExtractFound(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	m := New()
-	m.usersBaseURL = srv.URL
+	m := New(WithBaseURL(srv.URL))
 
 	node := graph.NewNode("username", "testuser", "seed")
 	client := httpclient.New()
@@ -139,8 +138,7 @@ func TestExtractNotFound(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	m := New()
-	m.usersBaseURL = srv.URL
+	m := New(WithBaseURL(srv.URL))
 
 	node := graph.NewNode("username", "nonexistentuser", "seed")
 	client := httpclient.New()
@@ -183,8 +181,7 @@ func TestVerifyHealthy(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	m := New()
-	m.usersBaseURL = srv.URL
+	m := New(WithBaseURL(srv.URL))
 
 	client := httpclient.New()
 	status, msg := m.Verify(context.Background(), client)
@@ -199,8 +196,7 @@ func TestVerifyOffline(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	m := New()
-	m.usersBaseURL = srv.URL
+	m := New(WithBaseURL(srv.URL))
 
 	client := httpclient.New()
 	status, msg := m.Verify(context.Background(), client)

@@ -70,6 +70,30 @@ func TestWalkerRunsModulesForSeed(t *testing.T) {
 	}
 }
 
+func TestWalkerContainsModulePanic(t *testing.T) {
+	g := graph.New()
+	reg := modules.NewRegistry()
+	mod := &fakeModule{
+		name:    "panic",
+		handles: []string{"username"},
+		health:  modules.Healthy,
+		extractFn: func(context.Context, *graph.Node) ([]*graph.Node, []*graph.Edge, error) {
+			panic("boom")
+		},
+	}
+	reg.Register(mod)
+	var events []Event
+	w := New(g, reg, WithEventHandler(func(event Event) { events = append(events, event) }))
+	w.Run(context.Background(), []graph.Seed{{Type: "username", Value: "testuser"}})
+	g.SnapshotStats()
+	if g.Meta.Stats.Errors != 1 {
+		t.Fatalf("expected one contained panic, got %d errors", g.Meta.Stats.Errors)
+	}
+	if len(events) == 0 || events[len(events)-1].Type != "module_error" {
+		t.Fatalf("expected module_error event, got %#v", events)
+	}
+}
+
 // TestWalkerSkipsOfflineModules verifies that offline modules are never called.
 func TestWalkerSkipsOfflineModules(t *testing.T) {
 	g := graph.New()

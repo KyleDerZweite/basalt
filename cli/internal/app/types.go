@@ -63,6 +63,8 @@ type ScanRequest struct {
 	RefreshModuleHealth    bool         `json:"refresh_module_health,omitempty"`
 	ClearModuleHealthCache bool         `json:"clear_module_health_cache,omitempty"`
 	ModuleHealthTTLSeconds int          `json:"module_health_ttl_seconds,omitempty"`
+	RequestsPerSecond      float64      `json:"requests_per_second,omitempty"`
+	ProxyFile              string       `json:"-"`
 }
 
 // ModuleStatus is the JSON-safe health view for a module.

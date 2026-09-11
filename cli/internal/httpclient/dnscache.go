@@ -38,21 +38,30 @@ func NewDNSCache(ttl time.Duration) *DNSCache {
 // Lookup returns the first resolved address for the hostname, using the cache
 // if available. Falls back to the system resolver on cache miss.
 func (d *DNSCache) Lookup(ctx context.Context, hostname string) (string, error) {
+	addrs, err := d.LookupAll(ctx, hostname)
+	if err != nil {
+		return "", err
+	}
+	return addrs[0], nil
+}
+
+// LookupAll returns all cached addresses for hostname.
+func (d *DNSCache) LookupAll(ctx context.Context, hostname string) ([]string, error) {
 	d.mu.RLock()
 	entry, ok := d.entries[hostname]
 	d.mu.RUnlock()
 
 	if ok && time.Since(entry.resolved) < entry.ttl && len(entry.addrs) > 0 {
-		return entry.addrs[0], nil
+		return append([]string(nil), entry.addrs...), nil
 	}
 
 	// Cache miss -- resolve.
 	addrs, err := net.DefaultResolver.LookupHost(ctx, hostname)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if len(addrs) == 0 {
-		return "", &net.DNSError{Err: "no addresses found", Name: hostname}
+		return nil, &net.DNSError{Err: "no addresses found", Name: hostname}
 	}
 
 	d.mu.Lock()
@@ -63,7 +72,7 @@ func (d *DNSCache) Lookup(ctx context.Context, hostname string) (string, error) 
 	}
 	d.mu.Unlock()
 
-	return addrs[0], nil
+	return append([]string(nil), addrs...), nil
 }
 
 // DialContext returns a DialContext function suitable for use with

@@ -13,23 +13,26 @@ import (
 	"github.com/KyleDerZweite/basalt/internal/modules"
 )
 
-const (
-	defaultUsersBaseURL = "https://users.roblox.com"
-	defaultThumbBaseURL = "https://thumbnails.roblox.com"
-)
+const defaultBaseURL = "https://users.roblox.com"
 
 // Module extracts profile data from Roblox via username lookup.
 type Module struct {
-	usersBaseURL string
-	thumbBaseURL string
+	baseURL string
 }
 
+// Option configures the Roblox module.
+type Option func(*Module)
+
+// WithBaseURL overrides the Roblox API endpoint, primarily for tests.
+func WithBaseURL(baseURL string) Option { return func(m *Module) { m.baseURL = baseURL } }
+
 // New creates a Roblox module.
-func New() *Module {
-	return &Module{
-		usersBaseURL: defaultUsersBaseURL,
-		thumbBaseURL: defaultThumbBaseURL,
+func New(opts ...Option) *Module {
+	m := &Module{baseURL: defaultBaseURL}
+	for _, opt := range opts {
+		opt(m)
 	}
+	return m
 }
 
 func (m *Module) Name() string                   { return "roblox" }
@@ -100,7 +103,7 @@ func (m *Module) Extract(ctx context.Context, node *graph.Node, client *httpclie
 // resolveUsername performs a POST request to resolve username to user ID.
 // Returns userID (0 if not found), user info, and error.
 func (m *Module) resolveUsername(ctx context.Context, client *httpclient.Client, username string) (int64, *usernameResponse, error) {
-	url := fmt.Sprintf("%s/v1/usernames/users", m.usersBaseURL)
+	url := fmt.Sprintf("%s/v1/usernames/users", m.baseURL)
 
 	reqBody := map[string]interface{}{
 		"usernames":          []string{username},
@@ -138,7 +141,7 @@ func (m *Module) resolveUsername(ctx context.Context, client *httpclient.Client,
 
 // getProfile retrieves full profile information by user ID.
 func (m *Module) getProfile(ctx context.Context, client *httpclient.Client, userID int64) (*profileResponse, error) {
-	url := fmt.Sprintf("%s/v1/users/%d", m.usersBaseURL, userID)
+	url := fmt.Sprintf("%s/v1/users/%d", m.baseURL, userID)
 
 	resp, err := client.Do(ctx, url, nil)
 	if err != nil {

@@ -91,7 +91,7 @@ func (g *Graph) UpsertNode(n *Node) NodeMutation {
 	if !exists {
 		g.nodes[n.ID] = n
 		return NodeMutation{
-			Node:        n,
+			Node:        cloneNode(n),
 			Added:       true,
 			Updated:     true,
 			BecamePivot: n.Pivot,
@@ -101,10 +101,21 @@ func (g *Graph) UpsertNode(n *Node) NodeMutation {
 	wasPivot := existing.Pivot
 	updated := mergeNode(existing, n)
 	return NodeMutation{
-		Node:        existing,
+		Node:        cloneNode(existing),
 		Updated:     updated,
 		BecamePivot: !wasPivot && existing.Pivot,
 	}
+}
+
+func cloneNode(node *Node) *Node {
+	clone := *node
+	if node.Properties != nil {
+		clone.Properties = make(map[string]interface{}, len(node.Properties))
+		for key, value := range node.Properties {
+			clone.Properties[key] = value
+		}
+	}
+	return &clone
 }
 
 // GetNode returns a node by ID, or nil if not found.

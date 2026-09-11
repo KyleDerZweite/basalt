@@ -16,15 +16,17 @@ import (
 type DomainRateLimiter struct {
 	mu       sync.RWMutex
 	limiters map[string]*rate.Limiter
-	global   *rate.Limiter
+	rps      rate.Limit
+	burst    int
 	jitter   time.Duration
 }
 
-// NewDomainRateLimiter creates a rate limiter with default global limits.
+// NewDomainRateLimiter creates independent token buckets with shared defaults.
 func NewDomainRateLimiter(rps float64, burst int) *DomainRateLimiter {
 	return &DomainRateLimiter{
 		limiters: make(map[string]*rate.Limiter),
-		global:   rate.NewLimiter(rate.Limit(rps), burst),
+		rps:      rate.Limit(rps),
+		burst:    burst,
 		jitter:   50 * time.Millisecond,
 	}
 }
@@ -46,7 +48,13 @@ func (d *DomainRateLimiter) Wait(ctx context.Context, rawURL string) error {
 	d.mu.RUnlock()
 
 	if !ok {
-		limiter = d.global
+		d.mu.Lock()
+		limiter, ok = d.limiters[domain]
+		if !ok {
+			limiter = rate.NewLimiter(d.rps, d.burst)
+			d.limiters[domain] = limiter
+		}
+		d.mu.Unlock()
 	}
 
 	if err := limiter.Wait(ctx); err != nil {
