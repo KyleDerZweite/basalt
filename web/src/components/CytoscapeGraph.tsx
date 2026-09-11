@@ -62,9 +62,9 @@ function buildStylesheet(): cytoscape.StylesheetStyle[] {
       },
     },
 
-    // ── Account node
+    // ── Account node (backend uses the "accounts" category)
     {
-      selector: 'node[category = "account"]',
+      selector: 'node[category = "account"], node[category = "accounts"]',
       style: {
         shape: "round-rectangle",
         width: 140,
@@ -260,8 +260,19 @@ export const CytoscapeGraph = forwardRef<CytoscapeGraphHandle, CytoscapeGraphPro
       });
       observer.observe(containerRef.current);
 
+      // Rebuild the stylesheet when the theme toggles so node colors follow CSS variables.
+      const themeObserver = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          if (mutation.attributeName === "data-theme" && cyRef.current) {
+            cyRef.current.style(buildStylesheet());
+          }
+        }
+      });
+      themeObserver.observe(document.documentElement, { attributes: true });
+
       return () => {
         observer.disconnect();
+        themeObserver.disconnect();
         cy.destroy();
         cyRef.current = null;
       };

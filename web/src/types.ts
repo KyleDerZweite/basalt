@@ -89,6 +89,10 @@ export type WorkspaceNode = {
   profile_url?: string;
   confidence?: number;
   collapsed_count?: number;
+  properties?: Record<string, string>;
+  source_modules?: string[];
+  wave?: number;
+  pivot?: boolean;
 };
 
 export type WorkspaceEdge = {

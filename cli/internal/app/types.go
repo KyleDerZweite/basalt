@@ -129,16 +129,20 @@ type ScanInsights struct {
 
 // WorkspaceNode is a node in the synthesized UI graph.
 type WorkspaceNode struct {
-	ID             string   `json:"id"`
-	Label          string   `json:"label"`
-	Type           string   `json:"type"`
-	Category       string   `json:"category"`
-	Depth          int      `json:"depth,omitempty"`
-	RawNodeIDs     []string `json:"raw_node_ids,omitempty"`
-	RawEdgeIDs     []string `json:"raw_edge_ids,omitempty"`
-	ProfileURL     string   `json:"profile_url,omitempty"`
-	Confidence     float64  `json:"confidence,omitempty"`
-	CollapsedCount int      `json:"collapsed_count,omitempty"`
+	ID             string            `json:"id"`
+	Label          string            `json:"label"`
+	Type           string            `json:"type"`
+	Category       string            `json:"category"`
+	Depth          int               `json:"depth,omitempty"`
+	RawNodeIDs     []string          `json:"raw_node_ids,omitempty"`
+	RawEdgeIDs     []string          `json:"raw_edge_ids,omitempty"`
+	ProfileURL     string            `json:"profile_url,omitempty"`
+	Confidence     float64           `json:"confidence,omitempty"`
+	CollapsedCount int               `json:"collapsed_count,omitempty"`
+	Properties     map[string]string `json:"properties,omitempty"`
+	SourceModules  []string          `json:"source_modules,omitempty"`
+	Wave           int               `json:"wave,omitempty"`
+	Pivot          bool              `json:"pivot,omitempty"`
 }
 
 // WorkspaceEdge is an edge in the synthesized UI graph.

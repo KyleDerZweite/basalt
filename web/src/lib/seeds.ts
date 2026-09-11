@@ -9,3 +9,11 @@ export function updateSeed(seeds: Seed[], setSeeds: (value: Seed[]) => void, ind
     ),
   );
 }
+
+/** Guess the seed type from a raw value: email, domain, or username. */
+export function detectSeedType(raw: string): Seed["type"] {
+  const value = raw.trim();
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return "email";
+  if (!/\s/.test(value) && /^(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/.test(value)) return "domain";
+  return "username";
+}

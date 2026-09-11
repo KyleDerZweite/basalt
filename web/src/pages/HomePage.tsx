@@ -7,6 +7,7 @@ import { EmptyState } from "../components/EmptyState";
 import { ModuleHealthList } from "../components/ModuleHealthList";
 import { PretextBlock } from "../components/PretextBlock";
 import { formatDate } from "../lib/format";
+import { detectSeedType } from "../lib/seeds";
 import { ACTIVE_STATUSES } from "../lib/constants";
 import { lineHeights, pretextFonts } from "../lib/typography";
 import type { ModuleStatus, ScanRecord, Target } from "../types";
@@ -33,8 +34,9 @@ export function HomePage({ scans, targets, health }: HomePageProps) {
 
   function handleQuickLaunch(e: React.FormEvent) {
     e.preventDefault();
-    if (!quickSeed.trim()) return;
-    navigate(`/new?seed=${encodeURIComponent(quickSeed.trim())}`);
+    const value = quickSeed.trim();
+    if (!value) return;
+    navigate(`/new?seed=${encodeURIComponent(value)}&seedType=${detectSeedType(value)}`);
   }
 
   const healthyCount = health.filter((m) => m.status === "healthy").length;
@@ -43,18 +45,18 @@ export function HomePage({ scans, targets, health }: HomePageProps) {
     <div>
       {/* Page header */}
       <div className="page-header">
-        <div className="page-header-kicker">Intelligence Platform</div>
+        <div className="page-header-kicker">Investigations</div>
         <PretextBlock
           as="h1"
           className="page-header-title"
-          text="Dashboard"
+          text="Cases"
           font={pretextFonts.pageTitle}
           lineHeight={lineHeights.title}
         />
         <PretextBlock
           as="p"
           className="page-header-desc"
-          text="Overview of recent investigations and module health."
+          text="Track targets and review past scans."
           font={pretextFonts.pageDescription}
           lineHeight={lineHeights.body}
         />

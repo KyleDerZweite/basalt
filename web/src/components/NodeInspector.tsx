@@ -1,14 +1,8 @@
 import { Crosshair, ExternalLink } from "lucide-react";
-import type { WorkspaceNode } from "../types";
+import type { WorkspaceEdge, WorkspaceNode } from "../types";
 import { formatNodeType } from "../lib/format";
 import { PretextBlock } from "./PretextBlock";
 import { lineHeights, pretextFonts } from "../lib/typography";
-
-const READABLE_PROPS = new Set([
-  "site_name", "profile_url", "full_name", "location",
-  "website", "bio", "email", "username", "organization",
-  "seed_type",
-]);
 
 function confidenceClass(c: number): string {
   if (c >= 0.75) return "high";
@@ -18,29 +12,49 @@ function confidenceClass(c: number): string {
 
 interface NodeInspectorProps {
   node: WorkspaceNode | null;
+  nodes: WorkspaceNode[];
+  edges: WorkspaceEdge[];
+  onSelectNode?: (id: string) => void;
 }
 
-export function NodeInspector({ node }: NodeInspectorProps) {
+export function NodeInspector({ node, nodes, edges, onSelectNode }: NodeInspectorProps) {
   if (!node) {
     return (
       <div className="node-inspector">
         <div className="empty-state" style={{ padding: "24px 0" }}>
           <div className="empty-state-icon"><Crosshair size={24} /></div>
           <div className="empty-state-title">No node selected</div>
-          <div className="empty-state-desc">Click a node in the graph to inspect it.</div>
+          <div className="empty-state-desc">Click a node in the graph to inspect its evidence.</div>
         </div>
       </div>
     );
   }
 
   const confidence = node.confidence ?? 0;
-  const props = Object.entries(node).filter(
-    ([k, v]) =>
-      READABLE_PROPS.has(k) &&
-      v != null &&
-      v !== "" &&
-      k !== "profile_url"
-  );
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const incoming = edges.filter((e) => e.target === node.id);
+  const outgoing = edges.filter((e) => e.source === node.id);
+  const propEntries = Object.entries(node.properties ?? {})
+    .filter(([, v]) => v != null && v !== "")
+    .sort(([a], [b]) => a.localeCompare(b));
+
+  const renderNeighbor = (edgeId: string, neighborId: string, direction: "from" | "to") => {
+    const neighbor = byId.get(neighborId);
+    const label = neighbor?.label ?? neighborId;
+    return (
+      <button
+        key={edgeId}
+        type="button"
+        className="inspector-link-row"
+        onClick={() => onSelectNode?.(neighborId)}
+        title={direction === "from" ? "Incoming connection" : "Outgoing connection"}
+      >
+        <span className="inspector-link-dir">{direction === "from" ? "←" : "→"}</span>
+        <span className="inspector-link-label">{label}</span>
+        {neighbor && <span className="type-badge">{formatNodeType(neighbor.type)}</span>}
+      </button>
+    );
+  };
 
   return (
     <div className="node-inspector">
@@ -59,6 +73,9 @@ export function NodeInspector({ node }: NodeInspectorProps) {
             {node.category}
           </span>
         )}
+        {(node.source_modules ?? []).map((mod) => (
+          <span className="type-badge" key={mod}>{mod}</span>
+        ))}
         {node.collapsed_count != null && node.collapsed_count > 0 && (
           <span className="type-badge">+{node.collapsed_count} hidden</span>
         )}
@@ -80,6 +97,14 @@ export function NodeInspector({ node }: NodeInspectorProps) {
         </div>
       )}
 
+      {/* Pivot state */}
+      {(node.wave != null || node.pivot) && (
+        <div className="inspector-meta">
+          {node.wave != null && <span>Depth {node.wave}</span>}
+          {node.pivot && <span>Used for pivoting</span>}
+        </div>
+      )}
+
       {/* Profile link */}
       {node.profile_url && (
         <a
@@ -92,10 +117,10 @@ export function NodeInspector({ node }: NodeInspectorProps) {
         </a>
       )}
 
-      {/* Properties table */}
-      {props.length > 0 && (
+      {/* Evidence properties */}
+      {propEntries.length > 0 && (
         <div className="props-table">
-          {props.map(([key, value]) => (
+          {propEntries.map(([key, value]) => (
             <div className="props-row" key={key}>
               <div className="props-key">{key.replace(/_/g, " ")}</div>
               <PretextBlock
@@ -107,6 +132,17 @@ export function NodeInspector({ node }: NodeInspectorProps) {
               />
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Connections */}
+      {(incoming.length > 0 || outgoing.length > 0) && (
+        <div className="flex-col gap-2">
+          <div className="section-title">Connections</div>
+          <div className="flex-col gap-1">
+            {incoming.map((e) => renderNeighbor(e.id, e.source, "from"))}
+            {outgoing.map((e) => renderNeighbor(e.id, e.target, "to"))}
+          </div>
         </div>
       )}
     </div>

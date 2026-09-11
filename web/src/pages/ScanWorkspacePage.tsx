@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, AlertTriangle, CircleDashed, PanelRight, PanelRightClose } from "lucide-react";
 
@@ -33,6 +33,10 @@ export function ScanWorkspacePage({ onRefreshHome }: ScanWorkspacePageProps) {
   const [panelHidden, setPanelHidden] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [filterQuery, setFilterQuery] = useState("");
+  const [filterType, setFilterType] = useState("all");
+  const [minConfidence, setMinConfidence] = useState(0);
+  const [focusSelected, setFocusSelected] = useState(false);
   const isPanelOverlay = useMediaQuery("(max-width: 1199px)");
   const isPanelSheet = useMediaQuery("(max-width: 767px)");
 
@@ -63,10 +67,8 @@ export function ScanWorkspacePage({ onRefreshHome }: ScanWorkspacePageProps) {
     onWorkspaceUpdate: fetchWorkspace,
   });
 
-  // Auto-switch to events tab when scan starts
-  useEffect(() => {
-    if (isActive) setActiveTab("events");
-  }, [isActive]);
+  // The events tab keeps its unread count badge, but the panel stays where
+  // the user left it so live progress never pulls focus from the findings.
 
   useEffect(() => {
     if (isPanelOverlay) {
@@ -110,10 +112,41 @@ export function ScanWorkspacePage({ onRefreshHome }: ScanWorkspacePageProps) {
     a.click();
   };
 
-  // Cytoscape elements
-  const elements = useCytoscapeGraph(
-    workspace?.graph ?? { layout: "", nodes: [], edges: [] }
-  );
+  // Cytoscape elements, narrowed by the filter bar and optional focus mode.
+  const visibleGraph = useMemo(() => {
+    const graph = workspace?.graph ?? { layout: "", nodes: [], edges: [] };
+    const query = filterQuery.trim().toLowerCase();
+    const keep = new Set<string>();
+    for (const node of graph.nodes) {
+      if (filterType !== "all" && node.type !== filterType) continue;
+      if ((node.confidence ?? 0) < minConfidence) continue;
+      if (query && !`${node.label} ${node.type}`.toLowerCase().includes(query)) continue;
+      keep.add(node.id);
+    }
+    if (focusSelected && selectedNodeId && keep.has(selectedNodeId)) {
+      const neighbors = new Set<string>([selectedNodeId]);
+      for (const edge of graph.edges) {
+        if (edge.source === selectedNodeId && keep.has(edge.target)) neighbors.add(edge.target);
+        if (edge.target === selectedNodeId && keep.has(edge.source)) neighbors.add(edge.source);
+      }
+      for (const id of [...keep]) {
+        if (!neighbors.has(id)) keep.delete(id);
+      }
+    }
+    return {
+      layout: graph.layout,
+      nodes: graph.nodes.filter((n) => keep.has(n.id)),
+      edges: graph.edges.filter((e) => keep.has(e.source) && keep.has(e.target)),
+    };
+  }, [workspace, filterQuery, filterType, minConfidence, focusSelected, selectedNodeId]);
+
+  const elements = useCytoscapeGraph(visibleGraph);
+
+  const availableTypes = useMemo(() => {
+    const types = new Set<string>();
+    for (const node of workspace?.graph.nodes ?? []) types.add(node.type);
+    return [...types].sort();
+  }, [workspace]);
 
   const record = workspace?.record;
   const target = workspace?.target;
@@ -199,6 +232,54 @@ export function ScanWorkspacePage({ onRefreshHome }: ScanWorkspacePageProps) {
         <div className="workspace-body">
         {/* Graph canvas */}
         <div className="graph-canvas">
+          {/* Slim progress bar keeps the graph inspectable while a scan runs */}
+          {isActive && (
+            <div className="graph-progress" role="status">
+              <div className="spinner spinner-sm" />
+              <span>{isConnected ? "Scanning, graph updates live" : "Connecting"}</span>
+              <span className="mono">{events.length} events</span>
+            </div>
+          )}
+          <div className="graph-filterbar">
+            <input
+              type="text"
+              className="graph-filter-input"
+              placeholder="Filter nodes"
+              value={filterQuery}
+              onChange={(e) => setFilterQuery(e.target.value)}
+            />
+            <select
+              className="graph-filter-select"
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              title="Node type"
+            >
+              <option value="all">All types</option>
+              {availableTypes.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+            <label className="graph-filter-conf" title="Minimum confidence">
+              <span>≥{Math.round(minConfidence * 100)}%</span>
+              <input
+                type="range"
+                min={0}
+                max={0.9}
+                step={0.1}
+                value={minConfidence}
+                onChange={(e) => setMinConfidence(Number(e.target.value))}
+              />
+            </label>
+            <button
+              type="button"
+              className={`btn btn-ghost btn-sm${focusSelected ? " active" : ""}`}
+              onClick={() => setFocusSelected((f) => !f)}
+              disabled={!selectedNodeId}
+              title="Show only the selected node and its direct connections"
+            >
+              Focus
+            </button>
+          </div>
           <CytoscapeGraph
             ref={graphRef}
             elements={elements}
@@ -207,30 +288,26 @@ export function ScanWorkspacePage({ onRefreshHome }: ScanWorkspacePageProps) {
             resizeKey={`${panelHidden}-${isPanelOverlay}-${isPanelSheet}`}
           />
 
-          {/* Active scan overlay */}
-          {isActive && (
-            <div className="graph-building-overlay">
-              <div className="spinner" />
-              <div className="build-label">
-                {isConnected ? "SCANNING - BUILDING GRAPH" : "CONNECTING…"}
-              </div>
-            </div>
-          )}
-
           {/* Graph stats */}
           {!isActive && workspace.raw_node_count > 0 && (
             <div className="graph-stats-bar">
               <div className="graph-stat-chip">
-                <strong>{workspace.raw_node_count}</strong> raw nodes
+                Showing <strong>{visibleGraph.nodes.length}</strong> of <strong>{workspace.graph.nodes.length}</strong> nodes
               </div>
               <div className="graph-stat-chip">
-                <strong>{workspace.raw_edge_count}</strong> raw edges
-              </div>
-              <div className="graph-stat-chip">
-                <strong>{workspace.graph.nodes.length}</strong> synthesized
+                <strong>{workspace.raw_node_count}</strong> raw evidence nodes
               </div>
             </div>
           )}
+          <div className="graph-legend">
+            <span className="legend-item legend-root">Target</span>
+            <span className="legend-item legend-seed">Seed</span>
+            <span className="legend-item legend-account">Account</span>
+            <span className="legend-item legend-email">Email</span>
+            <span className="legend-item legend-domain">Domain</span>
+            <span className="legend-item legend-website">Website</span>
+            <span className="legend-item legend-username">Username</span>
+          </div>
         </div>
 
         {!panelHidden && isPanelOverlay && (
@@ -325,7 +402,12 @@ export function ScanWorkspacePage({ onRefreshHome }: ScanWorkspacePageProps) {
 
             {/* Inspector tab */}
             {activeTab === "inspector" && (
-              <NodeInspector node={selectedNode} />
+              <NodeInspector
+                node={selectedNode}
+                nodes={workspace.graph.nodes}
+                edges={workspace.graph.edges}
+                onSelectNode={handleNodeClick}
+              />
             )}
 
             {/* Events tab */}
@@ -352,21 +434,7 @@ export function ScanWorkspacePage({ onRefreshHome }: ScanWorkspacePageProps) {
                       <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>Edges</div>
                     </div>
                   </div>
-                </div>
-
-                <div className="flex-col gap-2">
-                  <div className="section-title">Export</div>
-                  <button className="btn btn-ghost btn-full" onClick={() => handleExport("json")}>
-                    Download JSON
-                  </button>
-                  <button className="btn btn-ghost btn-full" onClick={() => handleExport("csv")}>
-                    Download CSV
-                  </button>
-                  {workspace.raw_graph_available && (
-                    <button className="btn btn-ghost btn-full" onClick={handleExportPNG}>
-                      Export Graph PNG
-                    </button>
-                  )}
+                  <span className="form-hint">Exports live in the top bar. The raw graph is available through the JSON export.</span>
                 </div>
 
                 {record?.error_message && (

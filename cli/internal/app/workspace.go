@@ -396,7 +396,7 @@ func appendRawNodes(
 }
 
 func workspaceNodeFromRaw(node *graph.Node, category string) WorkspaceNode {
-	return WorkspaceNode{
+	out := WorkspaceNode{
 		ID:         "raw:" + node.ID,
 		Label:      node.Label,
 		Type:       node.Type,
@@ -405,7 +405,52 @@ func workspaceNodeFromRaw(node *graph.Node, category string) WorkspaceNode {
 		RawNodeIDs: []string{node.ID},
 		ProfileURL: stringProperty(node.Properties, "profile_url"),
 		Confidence: node.Confidence,
+		Wave:       node.Wave,
+		Pivot:      node.Pivot,
 	}
+	if node.SourceModule != "" {
+		out.SourceModules = []string{node.SourceModule}
+	}
+	out.Properties = flattenProperties(node.Properties)
+	return out
+}
+
+// flattenProperties copies scalar evidence properties into display strings.
+// Compound values are skipped since the inspector cannot render them.
+// Output is capped so a single noisy module cannot bloat the payload.
+func flattenProperties(values map[string]interface{}) map[string]string {
+	if len(values) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	out := make(map[string]string, len(keys))
+	for _, key := range keys {
+		switch value := values[key].(type) {
+		case string:
+			if value != "" {
+				out[key] = value
+			}
+		case bool:
+			if value {
+				out[key] = "true"
+			} else {
+				out[key] = "false"
+			}
+		case float64:
+			out[key] = strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.2f", value), "0"), ".")
+		}
+		if len(out) >= 12 {
+			break
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func workspaceCategory(node *graph.Node) string {
