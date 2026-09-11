@@ -3,6 +3,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,9 +17,12 @@ import (
 	"github.com/KyleDerZweite/basalt/internal/graph"
 )
 
+const maxRequestBodySize = 1 << 20
+
 // Options configures the local HTTP API.
 type Options struct {
 	AuthToken      string
+	AuthCookieName string
 	AllowedOrigins []string
 }
 
@@ -27,6 +31,7 @@ func NewServer(service *app.Service, opts Options) http.Handler {
 	server := &Server{
 		service:        service,
 		authToken:      strings.TrimSpace(opts.AuthToken),
+		authCookieName: strings.TrimSpace(opts.AuthCookieName),
 		allowedOrigins: normalizeOrigins(opts.AllowedOrigins),
 	}
 
@@ -45,6 +50,7 @@ func NewServer(service *app.Service, opts Options) http.Handler {
 type Server struct {
 	service        *app.Service
 	authToken      string
+	authCookieName string
 	allowedOrigins []string
 }
 
@@ -72,7 +78,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, settings)
 	case http.MethodPut:
 		var settings app.Settings
-		if err := json.NewDecoder(r.Body).Decode(&settings); err != nil {
+		if err := decodeJSONBody(w, r, &settings); err != nil {
 			writeError(w, http.StatusBadRequest, fmt.Errorf("invalid settings payload: %w", err))
 			return
 		}
@@ -121,7 +127,7 @@ func (s *Server) handleScans(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"scans": scans})
 	case http.MethodPost:
 		var req app.ScanRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := decodeJSONBody(w, r, &req); err != nil {
 			writeError(w, http.StatusBadRequest, fmt.Errorf("invalid scan payload: %w", err))
 			return
 		}
@@ -147,7 +153,7 @@ func (s *Server) handleTargets(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"targets": targets})
 	case http.MethodPost:
 		var target app.Target
-		if err := json.NewDecoder(r.Body).Decode(&target); err != nil {
+		if err := decodeJSONBody(w, r, &target); err != nil {
 			writeError(w, http.StatusBadRequest, fmt.Errorf("invalid target payload: %w", err))
 			return
 		}
@@ -182,7 +188,7 @@ func (s *Server) handleTargetByID(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusOK, target)
 		case http.MethodPatch:
 			var target app.Target
-			if err := json.NewDecoder(r.Body).Decode(&target); err != nil {
+			if err := decodeJSONBody(w, r, &target); err != nil {
 				writeError(w, http.StatusBadRequest, fmt.Errorf("invalid target payload: %w", err))
 				return
 			}
@@ -217,7 +223,7 @@ func (s *Server) handleTargetByID(w http.ResponseWriter, r *http.Request) {
 				Label     string `json:"label"`
 				IsPrimary bool   `json:"is_primary"`
 			}
-			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			if err := decodeJSONBody(w, r, &payload); err != nil {
 				writeError(w, http.StatusBadRequest, fmt.Errorf("invalid alias payload: %w", err))
 				return
 			}
@@ -377,6 +383,14 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request, scanID str
 	}
 
 	after := int64(parseInt(r.URL.Query().Get("after"), 0))
+	if lastEventID := r.Header.Get("Last-Event-ID"); lastEventID != "" {
+		if parsed, err := strconv.ParseInt(lastEventID, 10, 64); err == nil && parsed > after {
+			after = parsed
+		}
+	}
+	events, cancel := s.service.Subscribe(scanID)
+	defer cancel()
+
 	backlog, err := s.service.GetEvents(scanID, after)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
@@ -391,11 +405,9 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request, scanID str
 		if err := writeSSE(w, event); err != nil {
 			return
 		}
+		after = event.Sequence
 	}
 	flusher.Flush()
-
-	events, cancel := s.service.Subscribe(scanID)
-	defer cancel()
 
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
@@ -405,6 +417,16 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request, scanID str
 		case <-r.Context().Done():
 			return
 		case <-ticker.C:
+			missed, err := s.service.GetEvents(scanID, after)
+			if err != nil {
+				return
+			}
+			for _, event := range missed {
+				if err := writeSSE(w, event); err != nil {
+					return
+				}
+				after = event.Sequence
+			}
 			if _, err := fmt.Fprint(w, ": keep-alive\n\n"); err != nil {
 				return
 			}
@@ -415,6 +437,21 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request, scanID str
 			}
 			if event.Sequence <= after {
 				continue
+			}
+			if event.Sequence > after+1 {
+				missing, err := s.service.GetEvents(scanID, after)
+				if err != nil {
+					return
+				}
+				for _, persisted := range missing {
+					if persisted.Sequence >= event.Sequence {
+						break
+					}
+					if err := writeSSE(w, persisted); err != nil {
+						return
+					}
+					after = persisted.Sequence
+				}
 			}
 			if err := writeSSE(w, event); err != nil {
 				return
@@ -443,31 +480,48 @@ func (s *Server) withAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		token, err := bearerToken(r)
-		if err != nil || token != s.authToken {
-			writeError(w, http.StatusUnauthorized, errors.New("missing or invalid bearer token"))
+		token, err := s.requestToken(r)
+		if err != nil || subtle.ConstantTimeCompare([]byte(token), []byte(s.authToken)) != 1 {
+			writeError(w, http.StatusUnauthorized, errors.New("missing or invalid authentication token"))
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
 }
 
+func (s *Server) requestToken(r *http.Request) (string, error) {
+	if token, err := bearerToken(r); err == nil {
+		return token, nil
+	}
+	if s.authCookieName != "" {
+		cookie, err := r.Cookie(s.authCookieName)
+		if err == nil {
+			return cookie.Value, nil
+		}
+	}
+	return "", errors.New("missing authentication token")
+}
+
 func (s *Server) withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		if corsOrigin, ok := s.allowedCORSOrigin(origin); ok {
+		if corsOrigin, ok := s.allowedCORSOrigin(r, origin); ok {
 			w.Header().Set("Access-Control-Allow-Origin", corsOrigin)
 			w.Header().Set("Vary", "Origin")
 		}
 		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
-		if r.Method == http.MethodOptions {
-			if origin != "" && len(s.allowedOrigins) > 0 {
-				if _, ok := s.allowedCORSOrigin(origin); !ok {
-					http.Error(w, "origin not allowed", http.StatusForbidden)
-					return
-				}
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+		if origin != "" {
+			if _, ok := s.allowedCORSOrigin(r, origin); !ok {
+				http.Error(w, "origin not allowed", http.StatusForbidden)
+				return
 			}
+		}
+		if isWriteMethod(r.Method) && strings.EqualFold(r.Header.Get("Sec-Fetch-Site"), "cross-site") {
+			http.Error(w, "cross-site request not allowed", http.StatusForbidden)
+			return
+		}
+		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
@@ -475,20 +529,34 @@ func (s *Server) withCORS(next http.Handler) http.Handler {
 	})
 }
 
-func (s *Server) allowedCORSOrigin(origin string) (string, bool) {
-	if len(s.allowedOrigins) == 0 {
-		if origin == "" {
-			return "", false
-		}
-		return "*", true
-	}
+func (s *Server) allowedCORSOrigin(r *http.Request, origin string) (string, bool) {
 	if origin == "" {
 		return "", false
+	}
+	requestOrigin := "http://" + r.Host
+	if r.TLS != nil {
+		requestOrigin = "https://" + r.Host
+	}
+	if origin == requestOrigin {
+		return origin, true
 	}
 	if slices.Contains(s.allowedOrigins, origin) {
 		return origin, true
 	}
 	return "", false
+}
+
+func isWriteMethod(method string) bool {
+	return method == http.MethodPost || method == http.MethodPut || method == http.MethodPatch || method == http.MethodDelete
+}
+
+func decodeJSONBody(w http.ResponseWriter, r *http.Request, target any) error {
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
+	decoder := json.NewDecoder(r.Body)
+	// Keep mutation payloads strict. Frontend request objects must use the exact
+	// JSON field names declared by their corresponding app types.
+	decoder.DisallowUnknownFields()
+	return decoder.Decode(target)
 }
 
 func normalizeOrigins(origins []string) []string {
@@ -526,6 +594,9 @@ func bearerToken(r *http.Request) (string, error) {
 func writeSSE(w http.ResponseWriter, event app.ScanEvent) error {
 	payload, err := json.Marshal(event)
 	if err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "id: %d\n", event.Sequence); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprintf(w, "event: %s\n", event.Type); err != nil {

@@ -28,8 +28,12 @@ type Service struct {
 	store   *Store
 	broker  *eventBroker
 
-	mu     sync.Mutex
-	active map[string]context.CancelFunc
+	mu        sync.Mutex
+	active    map[string]context.CancelFunc
+	scans     sync.WaitGroup
+	closed    bool
+	closeDone chan struct{}
+	closeErr  error
 }
 
 // NewService creates the shared backend service.
@@ -44,17 +48,39 @@ func NewService(version, dataDir string) (*Service, error) {
 	}
 
 	return &Service{
-		version: version,
-		dataDir: dataDir,
-		store:   store,
-		broker:  newEventBroker(),
-		active:  make(map[string]context.CancelFunc),
+		version:   version,
+		dataDir:   dataDir,
+		store:     store,
+		broker:    newEventBroker(),
+		active:    make(map[string]context.CancelFunc),
+		closeDone: make(chan struct{}),
 	}, nil
 }
 
 // Close releases service resources.
 func (s *Service) Close() error {
-	return s.store.Close()
+	s.mu.Lock()
+	if s.closed {
+		done := s.closeDone
+		s.mu.Unlock()
+		<-done
+		s.mu.Lock()
+		err := s.closeErr
+		s.mu.Unlock()
+		return err
+	}
+	s.closed = true
+	for _, cancel := range s.active {
+		cancel()
+	}
+	s.mu.Unlock()
+	s.scans.Wait()
+	err := s.store.Close()
+	s.mu.Lock()
+	s.closeErr = err
+	close(s.closeDone)
+	s.mu.Unlock()
+	return err
 }
 
 // DataDir returns the service data directory.
@@ -90,14 +116,18 @@ func (s *Service) StartScan(_ context.Context, req ScanRequest) (*ScanRecord, er
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	s.setActive(record.ID, cancel)
-
+	if err := s.setActive(record.ID, cancel); err != nil {
+		cancel()
+		return nil, err
+	}
+	snapshot := cloneScanRecord(record)
 	go func() {
+		defer s.scans.Done()
 		defer s.clearActive(record.ID)
 		s.executeScan(ctx, record, settings)
 	}()
 
-	return record, nil
+	return snapshot, nil
 }
 
 // RunScan executes a scan synchronously and persists it locally.
@@ -282,7 +312,11 @@ func (s *Service) executeScan(ctx context.Context, record *ScanRecord, settings 
 		})
 	}
 
-	client := httpclient.New(httpclient.WithTimeout(time.Duration(record.Options.TimeoutSeconds) * time.Second))
+	client, err := scanHTTPClient(record.Options)
+	if err != nil {
+		s.failScan(record, err)
+		return
+	}
 	w := walker.New(
 		graphData,
 		registry,
@@ -469,7 +503,10 @@ func (s *Service) resolveModuleHealth(ctx context.Context, req ScanRequest, regi
 			pendingRegistry.Register(mod)
 		}
 
-		client := httpclient.New(httpclient.WithTimeout(time.Duration(req.TimeoutSeconds) * time.Second))
+		client, err := scanHTTPClient(req)
+		if err != nil {
+			return nil, err
+		}
 		w := walker.New(
 			graph.New(),
 			pendingRegistry,
@@ -506,6 +543,31 @@ func (s *Service) resolveModuleHealth(ctx context.Context, req ScanRequest, regi
 	return out, nil
 }
 
+func scanHTTPClient(req ScanRequest) (*httpclient.Client, error) {
+	rps := req.RequestsPerSecond
+	if rps <= 0 {
+		rps = 5
+	}
+	opts := []httpclient.Option{
+		httpclient.WithTimeout(time.Duration(req.TimeoutSeconds) * time.Second),
+		httpclient.WithRateLimiter(httpclient.NewDomainRateLimiter(rps, 1)),
+		httpclient.WithDNSCache(httpclient.NewDNSCache(5 * time.Minute)),
+		httpclient.WithPrivateNetworkBlocking(),
+	}
+	if req.ProxyFile != "" {
+		proxyURLs, err := httpclient.LoadProxyFile(req.ProxyFile)
+		if err != nil {
+			return nil, fmt.Errorf("loading proxy file: %w", err)
+		}
+		pool, err := httpclient.NewProxyPool(proxyURLs)
+		if err != nil {
+			return nil, err
+		}
+		opts = append(opts, httpclient.WithTransport(pool.Transport()))
+	}
+	return httpclient.New(opts...), nil
+}
+
 func (s *Service) publishEvent(event *ScanEvent) {
 	if event.Time.IsZero() {
 		event.Time = time.Now().UTC()
@@ -517,16 +579,33 @@ func (s *Service) publishEvent(event *ScanEvent) {
 	s.broker.Publish(*event)
 }
 
-func (s *Service) setActive(scanID string, cancel context.CancelFunc) {
+func (s *Service) setActive(scanID string, cancel context.CancelFunc) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.closed {
+		return fmt.Errorf("service is closed")
+	}
 	s.active[scanID] = cancel
+	s.scans.Add(1)
+	return nil
 }
 
 func (s *Service) clearActive(scanID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.active, scanID)
+}
+
+func cloneScanRecord(record *ScanRecord) *ScanRecord {
+	if record == nil {
+		return nil
+	}
+	clone := *record
+	clone.Seeds = append([]graph.Seed(nil), record.Seeds...)
+	clone.Options.Seeds = append([]graph.Seed(nil), record.Options.Seeds...)
+	clone.Options.DisabledModules = append([]string(nil), record.Options.DisabledModules...)
+	clone.Health = append([]ModuleStatus(nil), record.Health...)
+	return &clone
 }
 
 func mergeSettings(settings Settings, req ScanRequest) Settings {

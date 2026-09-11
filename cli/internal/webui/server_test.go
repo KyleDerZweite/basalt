@@ -36,7 +36,10 @@ func TestBootstrapReturnsRuntimeConfig(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = service.Close() })
 
-	handler := NewServer(service, Options{BaseURL: "http://127.0.0.1:9999"})
+	handler, err := NewServer(service, Options{BaseURL: "http://127.0.0.1:9999"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/app/bootstrap", nil)
 	handler.ServeHTTP(rec, req)
@@ -67,6 +70,46 @@ func TestAPIRemainsMounted(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("GET /api/settings returned %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAuthenticatedWebSessionProtectsAPI(t *testing.T) {
+	service, err := app.NewService("test", t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = service.Close() })
+
+	handler, err := NewServer(service, Options{
+		BaseURL:   "http://127.0.0.1:8788",
+		AuthToken: "test-session-token",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	unauthorized := httptest.NewRecorder()
+	handler.ServeHTTP(unauthorized, httptest.NewRequest(http.MethodGet, "/api/settings", nil))
+	if unauthorized.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated API request returned %d", unauthorized.Code)
+	}
+
+	login := httptest.NewRecorder()
+	handler.ServeHTTP(login, httptest.NewRequest(http.MethodGet, "/?session=test-session-token", nil))
+	if login.Code != http.StatusSeeOther {
+		t.Fatalf("session setup returned %d: %s", login.Code, login.Body.String())
+	}
+	cookies := login.Result().Cookies()
+	if len(cookies) != 1 || !cookies[0].HttpOnly || cookies[0].SameSite != http.SameSiteStrictMode {
+		t.Fatalf("unexpected session cookie: %#v", cookies)
+	}
+
+	authorized := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/settings", nil)
+	req.AddCookie(cookies[0])
+	handler.ServeHTTP(authorized, req)
+	if authorized.Code != http.StatusOK {
+		t.Fatalf("authenticated API request returned %d: %s", authorized.Code, authorized.Body.String())
 	}
 }
 
@@ -112,5 +155,9 @@ func testServer(t *testing.T) http.Handler {
 		_ = service.Close()
 	})
 
-	return NewServer(service, Options{BaseURL: "http://127.0.0.1:8788"})
+	handler, err := NewServer(service, Options{BaseURL: "http://127.0.0.1:8788"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return handler
 }

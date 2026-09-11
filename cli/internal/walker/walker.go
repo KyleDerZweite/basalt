@@ -199,6 +199,14 @@ func (w *Walker) dispatch(ctx context.Context, node *graph.Node) {
 		w.inflight.Add(1)
 		go func() {
 			defer w.inflight.Done()
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					err := fmt.Errorf("module panic: %v", recovered)
+					slog.Error("module panic", "module", mod.Name(), "node", node.ID, "err", err)
+					w.graph.IncrErrors()
+					w.emit(Event{Type: "module_error", Module: mod.Name(), NodeID: node.ID, Message: err.Error()})
+				}
+			}()
 
 			// Acquire semaphore.
 			select {

@@ -29,5 +29,5 @@ func defaultDBPath(dataDir string) string {
 }
 
 func defaultDBDSN(dataDir string) string {
-	return defaultDBPath(dataDir) + "?_pragma=foreign_keys(1)"
+	return defaultDBPath(dataDir) + "?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)"
 }

@@ -27,6 +27,7 @@ export function NewScanPage({ targets, settings, health, onCreated }: NewScanPag
   const [seeds, setSeeds] = useState<Seed[]>(DEFAULT_SEEDS);
   const [depth, setDepth] = useState(2);
   const [concurrency, setConcurrency] = useState(5);
+  const [requestsPerSecond, setRequestsPerSecond] = useState(5);
   const [timeout, setTimeout_] = useState(10);
   const [strictMode, setStrictMode] = useState(settings?.strict_mode ?? false);
   const [disabledModules, setDisabledModules] = useState<string[]>(settings?.disabled_modules ?? []);
@@ -95,6 +96,7 @@ export function NewScanPage({ targets, settings, health, onCreated }: NewScanPag
           seeds: validSeeds.length > 0 ? validSeeds : undefined,
           depth,
           concurrency,
+          requests_per_second: requestsPerSecond,
           timeout_seconds: timeout,
           strict_mode: strictMode,
           disabled_modules: disabledModules.length > 0 ? disabledModules : undefined,
@@ -222,7 +224,20 @@ export function NewScanPage({ targets, settings, health, onCreated }: NewScanPag
                     <span className="form-hint">Number of modules running in parallel.</span>
                   </div>
 
-                  {/* Timeout */}
+                  {/* Rate limit */}
+                  <div className="form-group">
+                    <label className="form-label">Requests per second</label>
+                    <input
+                      type="number"
+                      min={0.1}
+                      max={100}
+                      step={0.1}
+                      value={requestsPerSecond}
+                      onChange={(e) => setRequestsPerSecond(Number(e.target.value))}
+                    />
+                    <span className="form-hint">Per-domain request limit for this scan.</span>
+                  </div>
+
                   <div className="form-group">
                     <label className="form-label">Timeout (seconds)</label>
                     <input
@@ -288,6 +303,11 @@ export function NewScanPage({ targets, settings, health, onCreated }: NewScanPag
           <div className="scan-preview-card">
             <div className="scan-preview-label">Scan Preview</div>
             <div className="scan-preview-body">
+              <div className="scan-preview-row">
+                <div className="scan-preview-key">Rate limit</div>
+                <div className="scan-preview-val">{requestsPerSecond}/s</div>
+              </div>
+
               <div className="scan-preview-row">
                 <div className="scan-preview-key">Target</div>
                 <div className="scan-preview-val">
