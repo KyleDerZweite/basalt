@@ -52,7 +52,7 @@ jobs:
           cache-dependency-path: cli/go.sum
 
       - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
 
       - name: Scan CLI dependencies
         run: govulncheck ./...
