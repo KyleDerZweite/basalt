@@ -60,6 +60,24 @@ export type ScanInsights = {
   identity_signals?: string[];
   infrastructure_summary?: string[];
   warnings?: string[];
+  linked_identities?: LinkedIdentity[];
+  possible_matches?: PossibleMatch[];
+};
+
+export type LinkedIdentity = {
+  identifier: string;
+  identifier_type: string;
+  account_labels: string[];
+  node_ids?: string[];
+  modules?: string[];
+};
+
+export type PossibleMatch = {
+  label_a: string;
+  label_b: string;
+  reason: string;
+  node_ids?: string[];
+  confidence?: number;
 };
 
 export type ScanRecord = {

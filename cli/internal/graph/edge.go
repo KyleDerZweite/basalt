@@ -14,6 +14,8 @@ const (
 	EdgeTypeResolvesTo   = "resolves_to"
 	EdgeTypeLinkedTo     = "linked_to"
 	EdgeTypeMentions     = "mentions"
+	EdgeTypeFollows      = "follows"
+	EdgeTypeFriendOf     = "friend_of"
 )
 
 // Edge represents a directed relationship between two nodes.

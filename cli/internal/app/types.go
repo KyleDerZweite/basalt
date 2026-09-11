@@ -125,6 +125,30 @@ type ScanInsights struct {
 	IdentitySignals        []string         `json:"identity_signals,omitempty"`
 	InfrastructureSummary  []string         `json:"infrastructure_summary,omitempty"`
 	Warnings               []string         `json:"warnings,omitempty"`
+	LinkedIdentities       []LinkedIdentity `json:"linked_identities,omitempty"`
+	PossibleMatches        []PossibleMatch  `json:"possible_matches,omitempty"`
+}
+
+// LinkedIdentity groups accounts that share one pivot identifier such
+// as an email, handle, or domain. Shared identifiers are the strongest
+// automatic signal that two accounts belong to one person.
+type LinkedIdentity struct {
+	Identifier     string   `json:"identifier"`
+	IdentifierType string   `json:"identifier_type"`
+	AccountLabels  []string `json:"account_labels"`
+	NodeIDs        []string `json:"node_ids,omitempty"`
+	Modules        []string `json:"modules,omitempty"`
+}
+
+// PossibleMatch flags two similar handles that may belong to one
+// person. Matching is explainable string similarity, not a black box:
+// exact normalized matches first, then small edit distances.
+type PossibleMatch struct {
+	LabelA     string   `json:"label_a"`
+	LabelB     string   `json:"label_b"`
+	Reason     string   `json:"reason"`
+	NodeIDs    []string `json:"node_ids,omitempty"`
+	Confidence float64  `json:"confidence,omitempty"`
 }
 
 // WorkspaceNode is a node in the synthesized UI graph.

@@ -11,9 +11,6 @@ importers:
       '@chenglou/pretext':
         specifier: ^0.0.7
         version: 0.0.7
-      cytoscape:
-        specifier: ^3.34.3
-        version: 3.34.3
       lucide-react:
         specifier: ^1.45.0
         version: 1.45.0(react@19.3.0)
@@ -300,10 +297,6 @@ packages:
 
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
-
-  cytoscape@3.34.3:
-    resolution: {integrity: sha512-yfYGhRcGAntq6YBD583j4n0Eg3jIxvWmZtz/5uz9UYkeIStSlMxuUja+ec5j3iBD8nv1rwaOAYMW09tBdkSeaQ==}
-    engines: {node: '>=0.10'}
 
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
@@ -640,8 +633,6 @@ snapshots:
   cookie@1.1.1: {}
 
   csstype@3.2.3: {}
-
-  cytoscape@3.34.3: {}
 
   detect-libc@2.1.2: {}
 
