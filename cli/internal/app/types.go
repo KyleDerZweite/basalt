@@ -127,6 +127,7 @@ type ScanInsights struct {
 	Warnings               []string         `json:"warnings,omitempty"`
 	LinkedIdentities       []LinkedIdentity `json:"linked_identities,omitempty"`
 	PossibleMatches        []PossibleMatch  `json:"possible_matches,omitempty"`
+	Profiles               []PersonProfile  `json:"profiles,omitempty"`
 }
 
 // LinkedIdentity groups accounts that share one pivot identifier such
@@ -149,6 +150,23 @@ type PossibleMatch struct {
 	Reason     string   `json:"reason"`
 	NodeIDs    []string `json:"node_ids,omitempty"`
 	Confidence float64  `json:"confidence,omitempty"`
+}
+
+// PersonProfile aggregates the accounts, handles, contact points, and
+// avatars that appear to belong to one real person. Every reason on a
+// profile names its evidence so the operator can judge the merge.
+type PersonProfile struct {
+	ID            string   `json:"id"`
+	PrimaryHandle string   `json:"primary_handle"`
+	Usernames     []string `json:"usernames,omitempty"`
+	Names         []string `json:"names,omitempty"`
+	Emails        []string `json:"emails,omitempty"`
+	AvatarURLs    []string `json:"avatar_urls,omitempty"`
+	Domains       []string `json:"domains,omitempty"`
+	Modules       []string `json:"modules,omitempty"`
+	Confidence    float64  `json:"confidence"`
+	Reasons       []string `json:"reasons,omitempty"`
+	NodeIDs       []string `json:"node_ids,omitempty"`
 }
 
 // WorkspaceNode is a node in the synthesized UI graph.

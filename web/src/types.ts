@@ -62,6 +62,7 @@ export type ScanInsights = {
   warnings?: string[];
   linked_identities?: LinkedIdentity[];
   possible_matches?: PossibleMatch[];
+  profiles?: PersonProfile[];
 };
 
 export type LinkedIdentity = {
@@ -78,6 +79,20 @@ export type PossibleMatch = {
   reason: string;
   node_ids?: string[];
   confidence?: number;
+};
+
+export type PersonProfile = {
+  id: string;
+  primary_handle: string;
+  usernames?: string[];
+  names?: string[];
+  emails?: string[];
+  avatar_urls?: string[];
+  domains?: string[];
+  modules?: string[];
+  confidence: number;
+  reasons?: string[];
+  node_ids?: string[];
 };
 
 export type ScanRecord = {

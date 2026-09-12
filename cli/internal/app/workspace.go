@@ -122,6 +122,7 @@ func BuildScanInsights(g *graph.Graph, health []ModuleStatus, status ScanStatus)
 	insights.Warnings = limitStrings(warnings, 6)
 	insights.LinkedIdentities = linkIdentities(nodes, edges)
 	insights.PossibleMatches = possibleHandleMatches(nodes)
+	insights.Profiles = buildPersonProfiles(nodes, edges)
 
 	headlineParts := []string{}
 	if len(accounts) > 0 {

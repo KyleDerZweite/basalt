@@ -64,6 +64,7 @@ Current browser functionality focuses on operations rather than styling:
   - disable modules by name
 - Scan Workspace:
   - top summary cards and findings
+  - people profiles with handles, avatars, and merge reasons
   - evidence lists for accounts, linked identities, possible matches, and friends
   - full evidence inspector for the selected node
   - live event timeline over SSE

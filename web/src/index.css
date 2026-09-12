@@ -1388,6 +1388,66 @@ input[type="checkbox"] {
   color: var(--text-muted);
 }
 
+.profile-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  width: 100%;
+  padding: 12px;
+  text-align: left;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-dim);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.profile-card:hover {
+  border-color: var(--accent-dim);
+}
+
+.profile-avatar {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-dim);
+}
+
+.profile-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.profile-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.profile-head .mono {
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.profile-reasons {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.profile-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .inspector-meta {
   display: flex;
   gap: 8px;

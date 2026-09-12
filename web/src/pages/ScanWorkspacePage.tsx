@@ -155,6 +155,15 @@ export function ScanWorkspacePage({ onRefreshHome }: ScanWorkspacePageProps) {
     () => (insights?.top_findings ?? []).filter((f) => matchesQuery(`${f.title} ${f.summary}`)),
     [insights, matchesQuery]
   );
+  const profiles = useMemo(
+    () =>
+      (insights?.profiles ?? []).filter((p) =>
+        matchesQuery(
+          `${p.primary_handle} ${(p.usernames ?? []).join(" ")} ${(p.emails ?? []).join(" ")}`
+        )
+      ),
+    [insights, matchesQuery]
+  );
 
   const breadcrumb = target?.display_name ?? record?.seeds.map((s) => s.value).join(", ") ?? "Scan";
 
@@ -259,12 +268,68 @@ export function ScanWorkspacePage({ onRefreshHome }: ScanWorkspacePageProps) {
             />
           )}
 
+                    {profiles.length > 0 && (
+            <section>
+              <div className="section-head">
+                <span className="section-title">People</span>
+                <span className="mono" style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                  {profiles.length}
+                </span>
+              </div>
+              <div className="flex-col gap-2">
+                {profiles.map((profile) => (
+                  <button
+                    key={profile.id}
+                    type="button"
+                    className="profile-card"
+                    onClick={() => {
+                      const id = profile.node_ids?.[0];
+                      if (id) handleNodeClick(id);
+                    }}
+                  >
+                    {(profile.avatar_urls ?? [])[0] && (
+                      <img
+                        src={(profile.avatar_urls ?? [])[0]}
+                        alt=""
+                        className="profile-avatar"
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                    )}
+                    <span className="profile-body">
+                      <span className="profile-head">
+                        <strong>{profile.primary_handle}</strong>
+                        <span className="mono">{Math.round(profile.confidence * 100)}%</span>
+                      </span>
+                      {(profile.reasons ?? []).length > 0 && (
+                        <span className="profile-reasons">{(profile.reasons ?? []).join(" · ")}</span>
+                      )}
+                      <span className="profile-chips">
+                        {(profile.usernames ?? []).map((u) => (
+                          <span className="signal-chip" key={u}>{u}</span>
+                        ))}
+                        {(profile.emails ?? []).map((e) => (
+                          <span className="signal-chip" key={e}>{e}</span>
+                        ))}
+                        {(profile.modules ?? []).map((m) => (
+                          <span className="type-badge" key={m}>{m}</span>
+                        ))}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
           {findings.length > 0 && (
             <section>
               <div className="section-head">
                 <span className="section-title">Top Findings</span>
-              </div>
-              <div className="flex-col gap-2">
+              </div>              <div className="flex-col gap-2">
                 {findings.map((f, i) => (
                   <FindingCard key={i} finding={f} onSelectNode={handleNodeClick} />
                 ))}
