@@ -140,7 +140,63 @@ func (m *Module) extractByUsername(ctx context.Context, node *graph.Node, client
 		edges = append(edges, graph.NewEdge(0, account.ID, twitterNode.ID, graph.EdgeTypeHasUsername, "github"))
 	}
 
+	m.appendFriends(ctx, client, username, account, &nodes, &edges)
+
 	return nodes, edges, nil
+}
+
+// appendFriends adds follower and following links as non-pivot username
+// nodes. It is best effort: the social graph enriches cross-account
+// tracking, but a failed lookup must not fail the profile extraction.
+func (m *Module) appendFriends(ctx context.Context, client *httpclient.Client, username string, account *graph.Node, nodes *[]*graph.Node, edges *[]*graph.Edge) {
+	type friend struct {
+		Login   string `json:"login"`
+		HTMLURL string `json:"html_url"`
+	}
+	fetch := func(path string) []friend {
+		apiURL := fmt.Sprintf("%s/users/%s/%s?per_page=30", m.baseURL, url.PathEscape(username), path)
+		resp, err := client.Do(ctx, apiURL, m.headers())
+		if err != nil || resp.StatusCode != 200 {
+			return nil
+		}
+		var out []friend
+		if err := json.Unmarshal([]byte(resp.Body), &out); err != nil {
+			return nil
+		}
+		return out
+	}
+
+	for _, f := range fetch("followers") {
+		if f.Login == "" {
+			continue
+		}
+		friendNode := graph.NewNode(graph.NodeTypeUsername, f.Login, "github")
+		friendNode.Pivot = false
+		friendNode.Confidence = 0.55
+		friendNode.Properties["platform_hint"] = "github"
+		friendNode.Properties["relationship"] = "follower"
+		if f.HTMLURL != "" {
+			friendNode.Properties["profile_url"] = f.HTMLURL
+		}
+		*nodes = append(*nodes, friendNode)
+		*edges = append(*edges, graph.NewEdge(0, friendNode.ID, account.ID, graph.EdgeTypeFollows, "github"))
+	}
+
+	for _, f := range fetch("following") {
+		if f.Login == "" {
+			continue
+		}
+		friendNode := graph.NewNode(graph.NodeTypeUsername, f.Login, "github")
+		friendNode.Pivot = false
+		friendNode.Confidence = 0.55
+		friendNode.Properties["platform_hint"] = "github"
+		friendNode.Properties["relationship"] = "following"
+		if f.HTMLURL != "" {
+			friendNode.Properties["profile_url"] = f.HTMLURL
+		}
+		*nodes = append(*nodes, friendNode)
+		*edges = append(*edges, graph.NewEdge(0, account.ID, friendNode.ID, graph.EdgeTypeFollows, "github"))
+	}
 }
 
 func (m *Module) extractByEmail(ctx context.Context, node *graph.Node, client *httpclient.Client) ([]*graph.Node, []*graph.Edge, error) {

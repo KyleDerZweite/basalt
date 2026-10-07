@@ -56,7 +56,7 @@ func BuildScanInsights(g *graph.Graph, health []ModuleStatus, status ScanStatus)
 		return insights
 	}
 
-	nodes, _ := g.Collect()
+	nodes, edges := g.Collect()
 	var accounts []*graph.Node
 	identitySignals := make(map[string]struct{})
 	infraSignals := make(map[string]struct{})
@@ -120,6 +120,9 @@ func BuildScanInsights(g *graph.Graph, health []ModuleStatus, status ScanStatus)
 	insights.IdentitySignals = mapKeys(identitySignals, 6)
 	insights.InfrastructureSummary = mapKeys(infraSignals, 6)
 	insights.Warnings = limitStrings(warnings, 6)
+	insights.LinkedIdentities = linkIdentities(nodes, edges)
+	insights.PossibleMatches = possibleHandleMatches(nodes)
+	insights.Profiles = buildPersonProfiles(nodes, edges)
 
 	headlineParts := []string{}
 	if len(accounts) > 0 {
@@ -266,14 +269,43 @@ func BuildWorkspaceGraph(record *ScanRecord, target *Target) WorkspaceGraph {
 	nodes, _ := record.Graph.Collect()
 	grouped := groupWorkspaceNodes(nodes)
 
-	appendRawNodes(addBranchNode, addItemNode, "accounts", "Accounts", topNodes(grouped.accounts, 8), "account")
-	appendRawNodes(addBranchNode, addItemNode, "identity", "Identity signals", topNodes(dedupeWorkspaceNodes(grouped.identity), 6), "signal")
-	appendRawNodes(addBranchNode, addItemNode, "web", "Websites & domains", topNodes(dedupeWorkspaceNodes(grouped.web), 6), "asset")
+	appendRawNodes(addBranchNode, addItemNode, "accounts", "Accounts", topNodes(grouped.accounts, 30), "account")
+	appendRawNodes(addBranchNode, addItemNode, "identity", "Identity signals", topNodes(dedupeWorkspaceNodes(grouped.identity), 20), "signal")
+	appendRawNodes(addBranchNode, addItemNode, "web", "Websites & domains", topNodes(dedupeWorkspaceNodes(grouped.web), 20), "asset")
+
+	var people []*graph.Node
+	for _, node := range nodes {
+		if node.Type != graph.NodeTypeUsername {
+			continue
+		}
+		if relationship, _ := node.Properties["relationship"].(string); relationship != "" {
+			people = append(people, node)
+		}
+	}
+	if len(people) > 0 {
+		sortWorkspaceNodes(people)
+		dedupedPeople := dedupeWorkspaceNodes(people)
+		branchID := addBranchNode("people", "Friends & follows")
+		visiblePeople := topNodes(dedupedPeople, 30)
+		for _, node := range visiblePeople {
+			addItemNode(branchID, workspaceNodeFromRaw(node, "people"), "social")
+		}
+		if hidden := len(dedupedPeople) - len(visiblePeople); hidden > 0 {
+			addItemNode(branchID, WorkspaceNode{
+				ID:             "summary:people",
+				Label:          "Additional connections",
+				Type:           "summary",
+				Category:       "people",
+				Depth:          2,
+				CollapsedCount: hidden,
+			}, "summary")
+		}
+	}
 
 	if len(grouped.infra) > 0 {
 		branchID := addBranchNode("infra", "Infrastructure")
 		dedupedInfra := dedupeWorkspaceNodes(grouped.infra)
-		visibleInfra := topNodes(dedupedInfra, 4)
+		visibleInfra := topNodes(dedupedInfra, 12)
 		for _, node := range visibleInfra {
 			addItemNode(branchID, workspaceNodeFromRaw(node, "infra"), "infra")
 		}
@@ -396,7 +428,7 @@ func appendRawNodes(
 }
 
 func workspaceNodeFromRaw(node *graph.Node, category string) WorkspaceNode {
-	return WorkspaceNode{
+	out := WorkspaceNode{
 		ID:         "raw:" + node.ID,
 		Label:      node.Label,
 		Type:       node.Type,
@@ -405,7 +437,52 @@ func workspaceNodeFromRaw(node *graph.Node, category string) WorkspaceNode {
 		RawNodeIDs: []string{node.ID},
 		ProfileURL: stringProperty(node.Properties, "profile_url"),
 		Confidence: node.Confidence,
+		Wave:       node.Wave,
+		Pivot:      node.Pivot,
 	}
+	if node.SourceModule != "" {
+		out.SourceModules = []string{node.SourceModule}
+	}
+	out.Properties = flattenProperties(node.Properties)
+	return out
+}
+
+// flattenProperties copies scalar evidence properties into display strings.
+// Compound values are skipped since the inspector cannot render them.
+// Output is capped so a single noisy module cannot bloat the payload.
+func flattenProperties(values map[string]interface{}) map[string]string {
+	if len(values) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	out := make(map[string]string, len(keys))
+	for _, key := range keys {
+		switch value := values[key].(type) {
+		case string:
+			if value != "" {
+				out[key] = value
+			}
+		case bool:
+			if value {
+				out[key] = "true"
+			} else {
+				out[key] = "false"
+			}
+		case float64:
+			out[key] = strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.2f", value), "0"), ".")
+		}
+		if len(out) >= 12 {
+			break
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func workspaceCategory(node *graph.Node) string {
@@ -484,6 +561,272 @@ func summaryForAccount(node *graph.Node) string {
 		parts = append(parts, "location: "+location)
 	}
 	return strings.Join(parts, ", ")
+}
+
+// linkIdentities groups accounts that share one pivot identifier.
+// Only identifiers claimed by at least two accounts are returned,
+// ordered by group size. Output is capped to keep payloads small.
+func linkIdentities(nodes []*graph.Node, edges []*graph.Edge) []LinkedIdentity {
+	byID := make(map[string]*graph.Node, len(nodes))
+	for _, node := range nodes {
+		byID[node.ID] = node
+	}
+
+	type group struct {
+		identifier string
+		kind       string
+		accounts   map[string]*graph.Node
+		nodeIDs    map[string]struct{}
+		modules    map[string]struct{}
+	}
+	groups := make(map[string]*group)
+	for _, edge := range edges {
+		target, ok := byID[edge.Target]
+		if !ok {
+			continue
+		}
+		switch target.Type {
+		case graph.NodeTypeEmail, graph.NodeTypeUsername, graph.NodeTypeDomain, graph.NodeTypePhone:
+		default:
+			continue
+		}
+		source, ok := byID[edge.Source]
+		if !ok || source.Type != graph.NodeTypeAccount {
+			continue
+		}
+		key := target.Type + ":" + strings.ToLower(target.Label)
+		entry := groups[key]
+		if entry == nil {
+			entry = &group{
+				identifier: target.Label,
+				kind:       target.Type,
+				accounts:   make(map[string]*graph.Node),
+				nodeIDs:    make(map[string]struct{}),
+				modules:    make(map[string]struct{}),
+			}
+			groups[key] = entry
+		}
+		entry.accounts[source.ID] = source
+		entry.nodeIDs[target.ID] = struct{}{}
+		if source.SourceModule != "" {
+			entry.modules[source.SourceModule] = struct{}{}
+		}
+	}
+
+	out := make([]LinkedIdentity, 0, len(groups))
+	for _, entry := range groups {
+		if len(entry.accounts) < 2 {
+			continue
+		}
+		labels := make([]string, 0, len(entry.accounts))
+		nodeIDs := make([]string, 0, len(entry.nodeIDs)+1)
+		for _, account := range entry.accounts {
+			labels = append(labels, account.Label)
+			nodeIDs = append(nodeIDs, account.ID)
+		}
+		for id := range entry.nodeIDs {
+			nodeIDs = append(nodeIDs, id)
+		}
+		modules := make([]string, 0, len(entry.modules))
+		for module := range entry.modules {
+			modules = append(modules, module)
+		}
+		sort.Strings(labels)
+		sort.Strings(modules)
+		sort.Strings(nodeIDs)
+		out = append(out, LinkedIdentity{
+			Identifier:     entry.identifier,
+			IdentifierType: entry.kind,
+			AccountLabels:  labels,
+			NodeIDs:        nodeIDs,
+			Modules:        modules,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if len(out[i].AccountLabels) == len(out[j].AccountLabels) {
+			return out[i].Identifier < out[j].Identifier
+		}
+		return len(out[i].AccountLabels) > len(out[j].AccountLabels)
+	})
+	if len(out) > 8 {
+		return out[:8]
+	}
+	return out
+}
+
+// possibleHandleMatches flags handles that look like they belong to one
+// person: exact matches after normalization across different modules,
+// then small edit distances. Results carry the reason so the operator
+// can judge them instead of trusting a score.
+func possibleHandleMatches(nodes []*graph.Node) []PossibleMatch {
+	type candidate struct {
+		label  string
+		norm   string
+		module string
+		id     string
+	}
+	var cands []candidate
+	for _, node := range nodes {
+		if node.Type != graph.NodeTypeAccount && node.Type != graph.NodeTypeUsername {
+			continue
+		}
+		// Account labels carry a platform prefix ("github - kyledev").
+		// Match on the handle portion so the same handle on two
+		// platforms compares equal.
+		handle := node.Label
+		if parts := strings.SplitN(node.Label, " - ", 2); len(parts) == 2 {
+			handle = parts[1]
+		}
+		norm := normalizeHandle(handle)
+		if len(norm) < 4 {
+			continue
+		}
+		cands = append(cands, candidate{label: node.Label, norm: norm, module: node.SourceModule, id: node.ID})
+	}
+
+	var out []PossibleMatch
+	byNorm := make(map[string][]candidate)
+	for _, cand := range cands {
+		byNorm[cand.norm] = append(byNorm[cand.norm], cand)
+	}
+	for _, group := range byNorm {
+		modules := make(map[string]struct{})
+		for _, cand := range group {
+			modules[cand.module] = struct{}{}
+		}
+		if len(modules) < 2 {
+			continue
+		}
+		labels := make([]string, 0, len(group))
+		ids := make([]string, 0, len(group))
+		names := make([]string, 0, len(modules))
+		for _, cand := range group {
+			labels = append(labels, cand.label)
+			ids = append(ids, cand.id)
+		}
+		for module := range modules {
+			names = append(names, module)
+		}
+		sort.Strings(labels)
+		sort.Strings(names)
+		sort.Strings(ids)
+		out = append(out, PossibleMatch{
+			LabelA:     labels[0],
+			LabelB:     labels[len(labels)-1],
+			Reason:     "Same handle on " + strings.Join(names, ", "),
+			NodeIDs:    ids,
+			Confidence: 0.85,
+		})
+	}
+
+	if len(cands) <= 300 {
+		seen := make(map[string]struct{})
+		for i := 0; i < len(cands); i++ {
+			for j := i + 1; j < len(cands); j++ {
+				a, b := cands[i], cands[j]
+				if a.norm == b.norm || a.module == b.module {
+					continue
+				}
+				if absInt(len(a.norm)-len(b.norm)) > 1 {
+					continue
+				}
+				distance := editDistance(a.norm, b.norm)
+				if distance == 0 || distance > 2 {
+					continue
+				}
+				key := a.norm + "\x00" + b.norm
+				if _, ok := seen[key]; ok {
+					continue
+				}
+				seen[key] = struct{}{}
+				out = append(out, PossibleMatch{
+					LabelA:     a.label,
+					LabelB:     b.label,
+					Reason:     fmt.Sprintf("Handles differ by %d character%s", distance, pluralS(distance)),
+					NodeIDs:    []string{a.id, b.id},
+					Confidence: 0.55,
+				})
+				if len(out) >= 16 {
+					break
+				}
+			}
+			if len(out) >= 16 {
+				break
+			}
+		}
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Confidence == out[j].Confidence {
+			return out[i].LabelA < out[j].LabelA
+		}
+		return out[i].Confidence > out[j].Confidence
+	})
+	if len(out) > 8 {
+		return out[:8]
+	}
+	return out
+}
+
+// normalizeHandle lowercases a handle and drops separators so
+// "Kyle_DerZweite" and "kylederzweite" compare equal.
+func normalizeHandle(label string) string {
+	var builder strings.Builder
+	for _, r := range strings.ToLower(label) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			builder.WriteRune(r)
+		}
+	}
+	return builder.String()
+}
+
+// editDistance returns the Levenshtein distance between two short strings.
+func editDistance(a, b string) int {
+	ar, br := []rune(a), []rune(b)
+	previous := make([]int, len(br)+1)
+	for j := range previous {
+		previous[j] = j
+	}
+	for i := 1; i <= len(ar); i++ {
+		current := make([]int, len(br)+1)
+		current[0] = i
+		for j := 1; j <= len(br); j++ {
+			cost := 0
+			if ar[i-1] != br[j-1] {
+				cost = 1
+			}
+			current[j] = minInt3(previous[j]+1, current[j-1]+1, previous[j-1]+cost)
+		}
+		previous = current
+	}
+	return previous[len(br)]
+}
+
+func minInt3(a, b, c int) int {
+	if a < b {
+		if a < c {
+			return a
+		}
+		return c
+	}
+	if b < c {
+		return b
+	}
+	return c
+}
+
+func absInt(value int) int {
+	if value < 0 {
+		return -value
+	}
+	return value
+}
+
+func pluralS(count int) string {
+	if count == 1 {
+		return ""
+	}
+	return "s"
 }
 
 func stringProperty(values map[string]interface{}, key string) string {

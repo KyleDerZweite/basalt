@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/KyleDerZweite/basalt/internal/graph"
@@ -159,5 +160,68 @@ func TestVerifyHealthy(t *testing.T) {
 	status, msg := m.Verify(context.Background(), client)
 	if status != modules.Healthy {
 		t.Errorf("expected Healthy, got %d: %s", status, msg)
+	}
+}
+
+func TestExtractFriends(t *testing.T) {
+	user := map[string]interface{}{
+		"login":    "kylederzweite",
+		"html_url": "https://github.com/kylederzweite",
+	}
+	followers := []interface{}{
+		map[string]interface{}{"login": "friendone", "html_url": "https://github.com/friendone"},
+	}
+	following := []interface{}{
+		map[string]interface{}{"login": "friendtwo", "html_url": "https://github.com/friendtwo"},
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/followers"):
+			json.NewEncoder(w).Encode(followers)
+		case strings.HasSuffix(r.URL.Path, "/following"):
+			json.NewEncoder(w).Encode(following)
+		default:
+			json.NewEncoder(w).Encode(user)
+		}
+	}))
+	defer srv.Close()
+
+	m := New("")
+	m.baseURL = srv.URL
+
+	node := graph.NewNode("username", "kylederzweite", "seed")
+	client := httpclient.New()
+
+	nodes, edges, err := m.Extract(context.Background(), node, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	found := map[string]string{}
+	for _, n := range nodes {
+		if relationship, ok := n.Properties["relationship"]; ok {
+			found[n.Label] = relationship.(string)
+			if n.Pivot {
+				t.Errorf("friend node %q should not pivot", n.Label)
+			}
+		}
+	}
+	if found["friendone"] != "follower" {
+		t.Errorf("expected follower friendone, got %+v", found)
+	}
+	if found["friendtwo"] != "following" {
+		t.Errorf("expected following friendtwo, got %+v", found)
+	}
+
+	var follows int
+	for _, e := range edges {
+		if e.Type == graph.EdgeTypeFollows {
+			follows++
+		}
+	}
+	if follows != 2 {
+		t.Errorf("expected 2 follows edges, got %d", follows)
 	}
 }

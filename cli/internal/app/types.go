@@ -125,20 +125,66 @@ type ScanInsights struct {
 	IdentitySignals        []string         `json:"identity_signals,omitempty"`
 	InfrastructureSummary  []string         `json:"infrastructure_summary,omitempty"`
 	Warnings               []string         `json:"warnings,omitempty"`
+	LinkedIdentities       []LinkedIdentity `json:"linked_identities,omitempty"`
+	PossibleMatches        []PossibleMatch  `json:"possible_matches,omitempty"`
+	Profiles               []PersonProfile  `json:"profiles,omitempty"`
+}
+
+// LinkedIdentity groups accounts that share one pivot identifier such
+// as an email, handle, or domain. Shared identifiers are the strongest
+// automatic signal that two accounts belong to one person.
+type LinkedIdentity struct {
+	Identifier     string   `json:"identifier"`
+	IdentifierType string   `json:"identifier_type"`
+	AccountLabels  []string `json:"account_labels"`
+	NodeIDs        []string `json:"node_ids,omitempty"`
+	Modules        []string `json:"modules,omitempty"`
+}
+
+// PossibleMatch flags two similar handles that may belong to one
+// person. Matching is explainable string similarity, not a black box:
+// exact normalized matches first, then small edit distances.
+type PossibleMatch struct {
+	LabelA     string   `json:"label_a"`
+	LabelB     string   `json:"label_b"`
+	Reason     string   `json:"reason"`
+	NodeIDs    []string `json:"node_ids,omitempty"`
+	Confidence float64  `json:"confidence,omitempty"`
+}
+
+// PersonProfile aggregates the accounts, handles, contact points, and
+// avatars that appear to belong to one real person. Every reason on a
+// profile names its evidence so the operator can judge the merge.
+type PersonProfile struct {
+	ID            string   `json:"id"`
+	PrimaryHandle string   `json:"primary_handle"`
+	Usernames     []string `json:"usernames,omitempty"`
+	Names         []string `json:"names,omitempty"`
+	Emails        []string `json:"emails,omitempty"`
+	AvatarURLs    []string `json:"avatar_urls,omitempty"`
+	Domains       []string `json:"domains,omitempty"`
+	Modules       []string `json:"modules,omitempty"`
+	Confidence    float64  `json:"confidence"`
+	Reasons       []string `json:"reasons,omitempty"`
+	NodeIDs       []string `json:"node_ids,omitempty"`
 }
 
 // WorkspaceNode is a node in the synthesized UI graph.
 type WorkspaceNode struct {
-	ID             string   `json:"id"`
-	Label          string   `json:"label"`
-	Type           string   `json:"type"`
-	Category       string   `json:"category"`
-	Depth          int      `json:"depth,omitempty"`
-	RawNodeIDs     []string `json:"raw_node_ids,omitempty"`
-	RawEdgeIDs     []string `json:"raw_edge_ids,omitempty"`
-	ProfileURL     string   `json:"profile_url,omitempty"`
-	Confidence     float64  `json:"confidence,omitempty"`
-	CollapsedCount int      `json:"collapsed_count,omitempty"`
+	ID             string            `json:"id"`
+	Label          string            `json:"label"`
+	Type           string            `json:"type"`
+	Category       string            `json:"category"`
+	Depth          int               `json:"depth,omitempty"`
+	RawNodeIDs     []string          `json:"raw_node_ids,omitempty"`
+	RawEdgeIDs     []string          `json:"raw_edge_ids,omitempty"`
+	ProfileURL     string            `json:"profile_url,omitempty"`
+	Confidence     float64           `json:"confidence,omitempty"`
+	CollapsedCount int               `json:"collapsed_count,omitempty"`
+	Properties     map[string]string `json:"properties,omitempty"`
+	SourceModules  []string          `json:"source_modules,omitempty"`
+	Wave           int               `json:"wave,omitempty"`
+	Pivot          bool              `json:"pivot,omitempty"`
 }
 
 // WorkspaceEdge is an edge in the synthesized UI graph.

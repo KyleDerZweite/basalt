@@ -48,6 +48,18 @@ export function Sidebar({
         />
       )}
 
+      {isCollapsed && (
+        <button
+          type="button"
+          className="sidebar-expand-btn"
+          onClick={() => setCollapsed(false)}
+          title="Expand sidebar"
+          aria-label="Expand sidebar"
+        >
+          <ChevronsRight size={14} />
+        </button>
+      )}
+
       <aside
         className={`sidebar${isCollapsed ? " collapsed" : ""}${isMobile ? " mobile" : ""}${mobileOpen ? " open" : ""}`}
       >
