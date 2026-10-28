@@ -465,6 +465,43 @@ func TestBuildWorkspaceAndInsights(t *testing.T) {
 	}
 }
 
+func TestWorkspaceRebuildsStoredSocialIdentityInsights(t *testing.T) {
+	store := testStore(t)
+	defer store.Close()
+	g := graph.New()
+	alice := graph.NewAccountNode("github", "alice123", "https://github.com/alice123", "github")
+	bob := graph.NewAccountNode("github", "bobby456", "https://github.com/bobby456", "github")
+	friend := graph.NewNode(graph.NodeTypeUsername, "popular789", "github")
+	friend.Properties["relationship"] = "following"
+	for _, node := range []*graph.Node{alice, bob, friend} {
+		g.AddNode(node)
+	}
+	g.AddEdge(graph.NewEdge(g.NextEdgeID(), alice.ID, friend.ID, graph.EdgeTypeFollows, "github"))
+	g.AddEdge(graph.NewEdge(g.NextEdgeID(), bob.ID, friend.ID, graph.EdgeTypeFollows, "github"))
+	now := time.Now().UTC()
+	record := &ScanRecord{
+		ID: "social-regression", Status: ScanStatusCompleted, StartedAt: now, UpdatedAt: now,
+		Seeds: []graph.Seed{{Type: graph.NodeTypeUsername, Value: "alice123"}}, Graph: g,
+		Insights: &ScanInsights{Profiles: []PersonProfile{{PrimaryHandle: "alice123", Usernames: []string{"alice123", "bobby456", "popular789"}}}},
+	}
+	if err := store.CreateScan(record); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpdateScan(record); err != nil {
+		t.Fatal(err)
+	}
+	workspace, err := (&Service{store: store}).BuildWorkspace(record.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(workspace.Insights.Profiles) != 2 || len(workspace.Insights.LinkedIdentities) != 0 {
+		t.Fatalf("stale identity grouping survived graph reload: %+v", workspace.Insights)
+	}
+	if workspace.RawNodeCount != 3 || workspace.RawEdgeCount != 2 {
+		t.Fatalf("raw relationship evidence changed: %+v", workspace)
+	}
+}
+
 func ptr[T any](value T) *T {
 	return &value
 }

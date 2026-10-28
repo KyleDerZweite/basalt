@@ -25,7 +25,7 @@ func (s *Service) BuildWorkspace(scanID string) (*ScanWorkspace, error) {
 	}
 
 	insights := record.Insights
-	if insights == nil && record.Graph != nil {
+	if record.Graph != nil {
 		generated := BuildScanInsights(record.Graph, record.Health, record.Status)
 		insights = &generated
 	}
@@ -486,6 +486,9 @@ func flattenProperties(values map[string]interface{}) map[string]string {
 }
 
 func workspaceCategory(node *graph.Node) string {
+	if node.Type == graph.NodeTypeUsername && stringProperty(node.Properties, "relationship") != "" {
+		return "people"
+	}
 	switch node.Type {
 	case graph.NodeTypeAccount:
 		return "accounts"
@@ -581,6 +584,9 @@ func linkIdentities(nodes []*graph.Node, edges []*graph.Edge) []LinkedIdentity {
 	}
 	groups := make(map[string]*group)
 	for _, edge := range edges {
+		if !isIdentityEvidenceEdge(edge.Type) {
+			continue
+		}
 		target, ok := byID[edge.Target]
 		if !ok {
 			continue

@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "test": "node --test test/evidence.test.ts",
     "build": "vite build",
     "typecheck": "tsc --noEmit"
   },

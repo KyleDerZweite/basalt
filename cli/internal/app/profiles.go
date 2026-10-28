@@ -46,6 +46,9 @@ func buildPersonProfiles(nodes []*graph.Node, edges []*graph.Edge) []PersonProfi
 	}
 	identifierAccounts := make(map[string]map[string]struct{})
 	for _, edge := range edges {
+		if !isIdentityEvidenceEdge(edge.Type) {
+			continue
+		}
 		source, ok := byID[edge.Source]
 		if !ok {
 			continue
@@ -110,6 +113,17 @@ func buildPersonProfiles(nodes []*graph.Node, edges []*graph.Edge) []PersonProfi
 		return out[:10]
 	}
 	return out
+}
+
+// Identity claims attach account attributes; social connections do not.
+func isIdentityEvidenceEdge(edgeType string) bool {
+	switch edgeType {
+	case graph.EdgeTypeHasAccount, graph.EdgeTypeHasEmail, graph.EdgeTypeHasDomain,
+		graph.EdgeTypeHasUsername, graph.EdgeTypeRegisteredTo, graph.EdgeTypeLinkedTo:
+		return true
+	default:
+		return false
+	}
 }
 
 // buildProfile assembles one profile from a cluster of accounts.

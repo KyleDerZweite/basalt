@@ -30,6 +30,8 @@ export type RawNode = {
   label: string;
   source_module: string;
   confidence: number;
+  wave?: number;
+  pivot?: boolean;
   properties?: Record<string, unknown>;
 };
 

@@ -85,5 +85,8 @@ jobs:
       - name: Typecheck web app
         run: pnpm typecheck
 
+      - name: Test evidence projection
+        run: pnpm test
+
       - name: Build web app
         run: pnpm build

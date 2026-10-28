@@ -10,6 +10,7 @@ import { StatusPill } from "../components/StatusPill";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useScanEvents } from "../hooks/useScanEvents";
 import { api } from "../lib/api";
+import { buildEvidenceGraph } from "../lib/evidence";
 import { asMessage } from "../lib/format";
 import { ACTIVE_STATUSES } from "../lib/constants";
 import { lineHeights, pretextFonts } from "../lib/typography";
@@ -23,9 +24,10 @@ type PanelTab = "inspector" | "events" | "raw";
 
 /** Findings carry raw graph IDs while the workspace uses synthesized IDs. */
 function resolveWorkspaceNode(nodes: WorkspaceNode[], id: string): WorkspaceNode | null {
+  const rawID = id.startsWith("raw:") ? id.slice(4) : id;
   return (
     nodes.find(
-      (n) => n.id === id || n.id === `raw:${id}` || (n.raw_node_ids ?? []).includes(id)
+      (n) => n.id === id || n.id === rawID || n.id === `raw:${rawID}` || (n.raw_node_ids ?? []).includes(rawID)
     ) ?? null
   );
 }
@@ -83,31 +85,32 @@ export function ScanWorkspacePage({ onRefreshHome }: ScanWorkspacePageProps) {
   }, [isPanelOverlay]);
 
   const nodes = useMemo(() => workspace?.graph.nodes ?? [], [workspace]);
-  const edges = useMemo(() => workspace?.graph.edges ?? [], [workspace]);
+  const evidence = useMemo(() => buildEvidenceGraph(workspace?.record.graph, nodes), [workspace, nodes]);
+  const selectableNodes = useMemo(() => [...evidence.nodes, ...nodes], [evidence, nodes]);
 
   // Node selection: findings use raw IDs, lists use workspace IDs.
   const selectedNode: WorkspaceNode | null = selectedNodeId
-    ? (resolveWorkspaceNode(nodes, selectedNodeId) ?? null)
+    ? (resolveWorkspaceNode(selectableNodes, selectedNodeId) ?? null)
     : null;
 
   const handleNodeClick = useCallback(
     (id: string) => {
-      const resolved = resolveWorkspaceNode(nodes, id);
+      const resolved = resolveWorkspaceNode(selectableNodes, id);
       setSelectedNodeId(resolved ? resolved.id : id);
       if (id) setActiveTab("inspector");
     },
-    [nodes]
+    [selectableNodes]
   );
 
   const handleLabelClick = useCallback(
     (label: string) => {
-      const resolved = resolveByLabel(nodes, label);
+      const resolved = resolveByLabel(selectableNodes, label);
       if (resolved) {
         setSelectedNodeId(resolved.id);
         setActiveTab("inspector");
       }
     },
-    [nodes]
+    [selectableNodes]
   );
 
   const handleCancel = async () => {
@@ -140,14 +143,14 @@ export function ScanWorkspacePage({ onRefreshHome }: ScanWorkspacePageProps) {
   const accounts = useMemo(
     () =>
       nodes
-        .filter((n) => n.category === "accounts" || n.category === "account")
+        .filter((n) => n.type === "account")
         .filter((n) => matchesQuery(`${n.label} ${(n.source_modules ?? []).join(" ")}`)),
     [nodes, matchesQuery]
   );
   const friends = useMemo(
     () =>
       nodes
-        .filter((n) => n.category === "people")
+        .filter((n) => n.category === "people" && n.type === "username")
         .filter((n) => matchesQuery(n.label)),
     [nodes, matchesQuery]
   );
@@ -414,7 +417,7 @@ export function ScanWorkspacePage({ onRefreshHome }: ScanWorkspacePageProps) {
                   <button
                     key={node.id}
                     type="button"
-                    className={`evidence-row${selectedNodeId === node.id ? " selected" : ""}`}
+                    className={`evidence-row${selectedNodeId === node.id || node.raw_node_ids?.includes(selectedNodeId) ? " selected" : ""}`}
                     onClick={() => handleNodeClick(node.id)}
                   >
                     <span className="evidence-main">{node.label}</span>
@@ -452,7 +455,7 @@ export function ScanWorkspacePage({ onRefreshHome }: ScanWorkspacePageProps) {
                   <button
                     key={node.id}
                     type="button"
-                    className={`evidence-row${selectedNodeId === node.id ? " selected" : ""}`}
+                    className={`evidence-row${selectedNodeId === node.id || node.raw_node_ids?.includes(selectedNodeId) ? " selected" : ""}`}
                     onClick={() => handleNodeClick(node.id)}
                   >
                     <span className="evidence-main">{node.label}</span>
@@ -534,8 +537,8 @@ export function ScanWorkspacePage({ onRefreshHome }: ScanWorkspacePageProps) {
             {activeTab === "inspector" && (
               <NodeInspector
                 node={selectedNode}
-                nodes={nodes}
-                edges={edges}
+                nodes={evidence.nodes}
+                edges={evidence.edges}
                 onSelectNode={handleNodeClick}
               />
             )}

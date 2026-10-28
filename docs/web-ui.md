@@ -97,7 +97,7 @@ Current browser functionality focuses on operations rather than styling:
 
 | Layer | Choice |
 |---|---|
-| Framework | React 19, TypeScript 5.9 |
+| Framework | React 19, TypeScript 7 |
 | Build | Vite 8, pnpm |
 | Routing | react-router-dom 7 |
 | Icons | lucide-react (tree-shakeable SVGs) |
@@ -135,5 +135,7 @@ Standard sizing: `12-14px` for inline buttons, `16px` for navigation, `24px` for
 - Targets and aliases are persisted locally and can be reused across scans.
 - The workspace shows structured evidence lists instead of a graph: findings, accounts, linked identities, possible matches, and friends. The full relationship graph stays available through the JSON export.
 - Linked identities group accounts that share an email, handle, domain, or phone number. Possible matches flag similar handles with the reason shown, so the operator judges them.
+- Follow, friend and mention relationships do not merge person profiles or establish linked identities. Friends remain in their own evidence list.
 - Selecting an entry opens its evidence in the inspector, including source modules, properties, and connections.
+- The inspector uses collected evidence connections and can navigate neighbors outside the capped lists. Category branches are presentation only.
 - `basalt serve` remains the headless integration path for custom clients.
