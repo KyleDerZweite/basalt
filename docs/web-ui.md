@@ -64,10 +64,11 @@ Current browser functionality focuses on operations rather than styling:
   - disable modules by name
 - Scan Workspace:
   - top summary cards and findings
-  - concentric radial mindmap graph with target/seed at center as the primary view
-  - persisted node and edge tables as secondary views
+  - people profiles with handles, avatars, and merge reasons
+  - evidence lists for accounts, linked identities, possible matches, and friends
+  - full evidence inspector for the selected node
   - live event timeline over SSE
-  - evidence/details panel for selected synthesized graph nodes
+  - evidence/details panel for the selected entry
   - cancel running scan
   - JSON and CSV export actions
 - Settings:
@@ -96,11 +97,10 @@ Current browser functionality focuses on operations rather than styling:
 
 | Layer | Choice |
 |---|---|
-| Framework | React 19, TypeScript 5.9 |
+| Framework | React 19, TypeScript 7 |
 | Build | Vite 8, pnpm |
 | Routing | react-router-dom 7 |
 | Icons | lucide-react (tree-shakeable SVGs) |
-| Graph | cytoscape (built-in concentric layout) |
 | Text layout | @chenglou/pretext |
 | Styling | Hand-written CSS (no Tailwind, no component library) |
 
@@ -133,7 +133,9 @@ Standard sizing: `12-14px` for inline buttons, `16px` for navigation, `24px` for
 - The web workspace is a thin local client. Scans, persistence, events, and exports still come from the Go backend.
 - Scan history and settings remain in the same SQLite database used by `basalt serve` and `basalt scan`.
 - Targets and aliases are persisted locally and can be reused across scans.
-- The graph uses a concentric radial layout: root at center (depth 0), seeds and category branches in the first ring (depth 1), leaf discoveries in the outer ring (depth 2). Single-seed scans promote the seed to the center root.
-- The graph shown in the UI is synthesized from the raw evidence graph so the main view stays readable and target-centric.
-- Selecting a node highlights it and its connected edges.
+- The workspace shows structured evidence lists instead of a graph: findings, accounts, linked identities, possible matches, and friends. The full relationship graph stays available through the JSON export.
+- Linked identities group accounts that share an email, handle, domain, or phone number. Possible matches flag similar handles with the reason shown, so the operator judges them.
+- Follow, friend and mention relationships do not merge person profiles or establish linked identities. Friends remain in their own evidence list.
+- Selecting an entry opens its evidence in the inspector, including source modules, properties, and connections.
+- The inspector uses collected evidence connections and can navigate neighbors outside the capped lists. Category branches are presentation only.
 - `basalt serve` remains the headless integration path for custom clients.

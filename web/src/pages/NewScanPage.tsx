@@ -6,6 +6,7 @@ import { PretextBlock } from "../components/PretextBlock";
 import { SeedInputRow } from "../components/SeedInputRow";
 import { api } from "../lib/api";
 import { asMessage } from "../lib/format";
+import { detectSeedType } from "../lib/seeds";
 import { lineHeights, pretextFonts } from "../lib/typography";
 import type { ModuleStatus, ScanRecord, Seed, Settings, Target } from "../types";
 
@@ -35,11 +36,12 @@ export function NewScanPage({ targets, settings, health, onCreated }: NewScanPag
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Pre-fill seed from quick-launch
+  // Pre-fill seed from quick-launch, guessing email and domain types
   useEffect(() => {
     const quickSeed = params.get("seed");
     if (quickSeed) {
-      setSeeds([{ type: "username", value: quickSeed }]);
+      const value = quickSeed.trim();
+      setSeeds([{ type: params.get("seedType") ?? detectSeedType(value), value }]);
     }
   }, [params]);
 
@@ -71,6 +73,35 @@ export function NewScanPage({ targets, settings, health, onCreated }: NewScanPag
       prev.includes(name) ? prev.filter((m) => m !== name) : [...prev, name]
     );
   };
+
+  const applyPreset = (name: "quick" | "balanced" | "thorough") => {
+    if (name === "quick") {
+      setDepth(1);
+      setConcurrency(8);
+      setRequestsPerSecond(8);
+      setTimeout_(8);
+    } else if (name === "thorough") {
+      setDepth(3);
+      setConcurrency(5);
+      setRequestsPerSecond(3);
+      setTimeout_(20);
+    } else {
+      setDepth(2);
+      setConcurrency(5);
+      setRequestsPerSecond(5);
+      setTimeout_(10);
+    }
+  };
+
+  const readyModules = health.filter(
+    (m) => m.status === "healthy" && !disabledModules.includes(m.name)
+  ).length;
+  const seedCount = Math.max(
+    seeds.filter((s) => s.value.trim() !== "").length,
+    selectedTargetAliasCount,
+    1
+  );
+  const estimatedRuns = readyModules * seedCount * depth;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -198,6 +229,23 @@ export function NewScanPage({ targets, settings, health, onCreated }: NewScanPag
 
               {advancedOpen && (
                 <div className="scan-settings-body">
+                  {/* Presets */}
+                  <div className="form-group">
+                    <label className="form-label">Presets</label>
+                    <div className="flex gap-2">
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => applyPreset("quick")}>
+                        Quick
+                      </button>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => applyPreset("balanced")}>
+                        Balanced
+                      </button>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => applyPreset("thorough")}>
+                        Thorough
+                      </button>
+                    </div>
+                    <span className="form-hint">Quick stays one hop out, thorough follows three hops with a lower rate limit.</span>
+                  </div>
+
                   {/* Depth */}
                   <div className="form-group">
                     <label className="form-label">Pivot Depth - {depth}</label>
@@ -372,10 +420,15 @@ export function NewScanPage({ targets, settings, health, onCreated }: NewScanPag
                 <div className="scan-preview-row">
                   <div className="scan-preview-key">Modules</div>
                   <div className="scan-preview-val" style={{ color: "var(--success)" }}>
-                    {health.filter((m) => m.status === "healthy" && !disabledModules.includes(m.name)).length} ready
+                    {readyModules} ready
                   </div>
                 </div>
               )}
+
+              <div className="scan-preview-row">
+                <div className="scan-preview-key">Cost</div>
+                <div className="scan-preview-val">Up to ~{estimatedRuns} module runs</div>
+              </div>
             </div>
           </div>
         </div>

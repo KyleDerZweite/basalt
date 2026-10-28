@@ -96,12 +96,17 @@ Local runtime data is stored in `~/.basalt` by default unless `--data-dir` is ov
 
 ## Development
 
+Use Go 1.27.3 or newer. For web development, use the Node.js version in
+`web/.node-version` and pnpm 10.29.2, pinned in `web/package.json`.
+Node.js 22 includes Corepack, which selects that pnpm version.
+
 ```bash
 cd web
-pnpm install
+corepack enable pnpm
+pnpm install --frozen-lockfile
 pnpm build
 
-cd cli
+cd ../cli
 go build ./...
 go vet ./...
 go test ./...
@@ -109,7 +114,7 @@ go test ./...
 
 ## Dependency updates
 
-Dependabot opens update PRs for Go modules, npm packages, and GitHub Actions.
+Dependabot opens update PRs for Go modules, pnpm-managed npm packages, and GitHub Actions each week.
 
 This repo does not auto merge those PRs. Each update needs human review and green `CLI` and `Web` checks before merge. The `Vulnerability scan` job also runs on pull requests as an advisory check.
 

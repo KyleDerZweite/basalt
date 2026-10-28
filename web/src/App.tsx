@@ -186,6 +186,7 @@ export function App() {
                     scans={scans}
                     targets={targets}
                     health={health}
+                    onCreated={refreshHome}
                   />
                 }
               />

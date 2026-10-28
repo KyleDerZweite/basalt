@@ -30,6 +30,8 @@ export type RawNode = {
   label: string;
   source_module: string;
   confidence: number;
+  wave?: number;
+  pivot?: boolean;
   properties?: Record<string, unknown>;
 };
 
@@ -60,6 +62,39 @@ export type ScanInsights = {
   identity_signals?: string[];
   infrastructure_summary?: string[];
   warnings?: string[];
+  linked_identities?: LinkedIdentity[];
+  possible_matches?: PossibleMatch[];
+  profiles?: PersonProfile[];
+};
+
+export type LinkedIdentity = {
+  identifier: string;
+  identifier_type: string;
+  account_labels: string[];
+  node_ids?: string[];
+  modules?: string[];
+};
+
+export type PossibleMatch = {
+  label_a: string;
+  label_b: string;
+  reason: string;
+  node_ids?: string[];
+  confidence?: number;
+};
+
+export type PersonProfile = {
+  id: string;
+  primary_handle: string;
+  usernames?: string[];
+  names?: string[];
+  emails?: string[];
+  avatar_urls?: string[];
+  domains?: string[];
+  modules?: string[];
+  confidence: number;
+  reasons?: string[];
+  node_ids?: string[];
 };
 
 export type ScanRecord = {
@@ -89,6 +124,10 @@ export type WorkspaceNode = {
   profile_url?: string;
   confidence?: number;
   collapsed_count?: number;
+  properties?: Record<string, string>;
+  source_modules?: string[];
+  wave?: number;
+  pivot?: boolean;
 };
 
 export type WorkspaceEdge = {

@@ -6,7 +6,9 @@ import { StatusPill } from "../components/StatusPill";
 import { EmptyState } from "../components/EmptyState";
 import { ModuleHealthList } from "../components/ModuleHealthList";
 import { PretextBlock } from "../components/PretextBlock";
-import { formatDate } from "../lib/format";
+import { formatDate, asMessage } from "../lib/format";
+import { detectSeedType } from "../lib/seeds";
+import { api } from "../lib/api";
 import { ACTIVE_STATUSES } from "../lib/constants";
 import { lineHeights, pretextFonts } from "../lib/typography";
 import type { ModuleStatus, ScanRecord, Target } from "../types";
@@ -15,11 +17,14 @@ interface HomePageProps {
   scans: ScanRecord[];
   targets: Target[];
   health: ModuleStatus[];
+  onCreated: () => Promise<void>;
 }
 
-export function HomePage({ scans, targets, health }: HomePageProps) {
+export function HomePage({ scans, targets, health, onCreated }: HomePageProps) {
   const navigate = useNavigate();
   const [quickSeed, setQuickSeed] = useState("");
+  const [quickLoading, setQuickLoading] = useState(false);
+  const [quickError, setQuickError] = useState("");
 
   const activeScans = scans.filter((s) => (ACTIVE_STATUSES as readonly string[]).includes(s.status));
   const recentScans = scans.slice(0, 12);
@@ -33,8 +38,34 @@ export function HomePage({ scans, targets, health }: HomePageProps) {
 
   function handleQuickLaunch(e: React.FormEvent) {
     e.preventDefault();
-    if (!quickSeed.trim()) return;
-    navigate(`/new?seed=${encodeURIComponent(quickSeed.trim())}`);
+    const value = quickSeed.trim();
+    if (!value) return;
+    navigate(`/new?seed=${encodeURIComponent(value)}&seedType=${detectSeedType(value)}`);
+  }
+
+  async function handleQuickScan(e: React.FormEvent) {
+    e.preventDefault();
+    const value = quickSeed.trim();
+    if (!value || quickLoading) return;
+    setQuickLoading(true);
+    setQuickError("");
+    try {
+      const scan = await api<ScanRecord>("/api/scans", {
+        method: "POST",
+        body: JSON.stringify({
+          seeds: [{ type: detectSeedType(value), value }],
+          depth: 2,
+          concurrency: 5,
+          requests_per_second: 5,
+          timeout_seconds: 10,
+        }),
+      });
+      await onCreated();
+      navigate(`/scans/${scan.id}`);
+    } catch (reason) {
+      setQuickError(asMessage(reason));
+      setQuickLoading(false);
+    }
   }
 
   const healthyCount = health.filter((m) => m.status === "healthy").length;
@@ -43,18 +74,18 @@ export function HomePage({ scans, targets, health }: HomePageProps) {
     <div>
       {/* Page header */}
       <div className="page-header">
-        <div className="page-header-kicker">Intelligence Platform</div>
+        <div className="page-header-kicker">Investigations</div>
         <PretextBlock
           as="h1"
           className="page-header-title"
-          text="Dashboard"
+          text="Cases"
           font={pretextFonts.pageTitle}
           lineHeight={lineHeights.title}
         />
         <PretextBlock
           as="p"
           className="page-header-desc"
-          text="Overview of recent investigations and module health."
+          text="Track targets and review past scans."
           font={pretextFonts.pageDescription}
           lineHeight={lineHeights.body}
         />
@@ -146,15 +177,24 @@ export function HomePage({ scans, targets, health }: HomePageProps) {
               <span className="card-title">Quick Scan</span>
             </div>
             <div className="card-body">
-              <form className="quick-launch" onSubmit={handleQuickLaunch}>
+              <form className="quick-launch" onSubmit={handleQuickScan}>
                 <input
                   type="text"
                   placeholder="username, email, or domain…"
                   value={quickSeed}
                   onChange={(e) => setQuickSeed(e.target.value)}
                 />
-                <button className="btn btn-primary btn-full" type="submit">
-                  Configure Scan <ArrowRight size={14} />
+                {quickError && <div className="error-banner">{quickError}</div>}
+                <button className="btn btn-primary btn-full" type="submit" disabled={quickLoading}>
+                  {quickLoading ? "Launching…" : <>Scan Now <ArrowRight size={14} /></>}
+                </button>
+                <button
+                  className="btn btn-ghost btn-full btn-sm"
+                  type="button"
+                  onClick={handleQuickLaunch}
+                  disabled={quickLoading}
+                >
+                  Configure First
                 </button>
               </form>
             </div>

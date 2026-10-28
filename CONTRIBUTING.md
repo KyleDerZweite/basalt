@@ -20,6 +20,9 @@ Thanks for your interest in contributing to Basalt! This document covers the pro
 ## Development
 
 All Go source lives under `cli/`, all web UI source under `web/`. See [AGENTS.md](AGENTS.md) for architecture, build commands, and conventions.
+Use Go 1.27.3 or newer. For the frontend, use the Node.js version in
+`web/.node-version` and pnpm 10.29.2 from `web/package.json`.
+Run `corepack enable pnpm` with Node.js 22 to select the pinned pnpm version.
 
 ```bash
 # Go backend
@@ -29,8 +32,8 @@ go test ./...         # test
 go vet ./...          # lint
 
 # Web frontend
-cd web
-pnpm install          # install deps
+cd ../web
+pnpm install --frozen-lockfile # install locked dependencies
 pnpm dev              # dev server
 pnpm build            # production build
 pnpm typecheck        # type check
