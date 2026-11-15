@@ -22,6 +22,9 @@ func TestWriteJSON(t *testing.T) {
 	if _, ok := out["nodes"]; !ok {
 		t.Error("JSON missing 'nodes'")
 	}
+	if _, ok := out["meta"]; !ok {
+		t.Error("JSON missing 'meta'")
+	}
 	if _, ok := out["edges"]; !ok {
 		t.Error("JSON missing 'edges'")
 	}

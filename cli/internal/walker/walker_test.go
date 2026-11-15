@@ -321,11 +321,13 @@ func TestWalkerGracefulShutdown(t *testing.T) {
 	g := graph.New()
 	reg := modules.NewRegistry()
 
+	started := make(chan struct{})
 	mod := &fakeModule{
 		name:    "slow",
 		handles: []string{"username"},
 		health:  modules.Healthy,
 		extractFn: func(ctx context.Context, _ *graph.Node) ([]*graph.Node, []*graph.Edge, error) {
+			close(started)
 			select {
 			case <-ctx.Done():
 				return nil, nil, ctx.Err()
@@ -337,6 +339,7 @@ func TestWalkerGracefulShutdown(t *testing.T) {
 	reg.Register(mod)
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	w := New(g, reg, WithMaxDepth(1), WithConcurrency(2), WithTimeout(30*time.Second))
 
 	done := make(chan struct{})
@@ -345,8 +348,12 @@ func TestWalkerGracefulShutdown(t *testing.T) {
 		close(done)
 	}()
 
-	// Cancel after 100ms.
-	time.AfterFunc(100*time.Millisecond, cancel)
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("module extraction did not start within 2s")
+	}
+	cancel()
 
 	select {
 	case <-done:

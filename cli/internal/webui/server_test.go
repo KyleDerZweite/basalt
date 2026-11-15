@@ -3,6 +3,7 @@
 package webui
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -139,8 +140,12 @@ func TestAssetsAreServed(t *testing.T) {
 	if got := rec.Header().Get("Content-Type"); !strings.Contains(got, "javascript") && !strings.Contains(got, "text/plain") {
 		t.Fatalf("expected JavaScript content type, got %q", got)
 	}
-	if !strings.Contains(rec.Body.String(), "createRoot") && !strings.Contains(rec.Body.String(), "modulepreload") {
-		t.Fatalf("expected JavaScript asset, got %s", rec.Body.String())
+	embedded, err := distFS.ReadFile("dist/assets/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(embedded) == 0 || !bytes.Equal(rec.Body.Bytes(), embedded) {
+		t.Fatal("response does not match the embedded JavaScript asset")
 	}
 }
 

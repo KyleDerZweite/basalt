@@ -19,7 +19,7 @@ Thanks for your interest in contributing to Basalt! This document covers the pro
 
 ## Development
 
-All Go source lives under `cli/`, all web UI source under `web/`. See [AGENTS.md](AGENTS.md) for architecture, build commands, and conventions.
+All Go source lives under `cli/`, all web UI source under `web/`. See [README.md](README.md) for build commands, [the local API guide](docs/local-api.md), and [the web workspace guide](docs/web-ui.md) for current behavior.
 Use Go 1.27.3 or newer. For the frontend, use the Node.js version in
 `web/.node-version` and pnpm 10.29.2 from `web/package.json`.
 Run `corepack enable pnpm` with Node.js 22 to select the pinned pnpm version.
@@ -51,11 +51,7 @@ Each module lives in its own package under `cli/internal/modules/<name>/` and im
 
 Follow the pattern of existing modules (e.g., `twitch`, `github`). Register your module in `cli/internal/app/modules.go`.
 
-Every module must include a `*_test.go` file with at least:
-- `TestCanHandle` -- verifies accepted node types
-- `TestExtractFound` -- happy path with a mock HTTP server
-- `TestExtractNotFound` -- 404 handling
-- `TestVerify` -- health check
+Test the behavior affected by a change. For source adapters, use local HTTP fixtures for meaningful parsing, not-found, and failure cases. A fixed list of test function names is not required. Avoid checks that only repeat assignments or depend on generated bundle internals.
 
 ## Working on the Web UI
 
@@ -68,7 +64,7 @@ The frontend is a React 19 + TypeScript SPA in `web/`. Key conventions:
 
 ## Submitting Changes
 
-1. Ensure all tests pass: `cd cli && go test ./...`
+1. Run the local checks relevant to the change and record what passed, failed, or did not run. CI is currently disabled.
 2. Keep commits focused -- one logical change per commit
 3. Write clear commit messages describing *why*, not just *what*
 4. Open a pull request against `main`
