@@ -56,7 +56,7 @@ Use `basalt --help` or `basalt <command> --help` for the current CLI surface.
 
 - [Local API](docs/local-api.md)
 - [Web Workspace](docs/web-ui.md)
-- [Future Modules](docs/future-modules.md)
+- [OSINT toolkit research and open decisions](docs/osint-toolkit-research.md)
 
 The README intentionally stays high level. API endpoints, workspace behavior, and backlog details live in `docs/`.
 
