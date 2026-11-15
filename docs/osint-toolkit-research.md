@@ -4,7 +4,7 @@ Observed on November 15, 2026. This document records research and open decisions
 
 ## Direction and recommendation
 
-The intended product is a broad OSINT toolkit with one consistent way to find and use the required tools. Account discovery is one task within that scope. Existing choices about zero-auth sources, handwritten CSS, language, and interface are inputs to review rather than requirements for the future product.
+The intended product is a broad, agent-driven OSINT toolkit with one consistent way to find and use the required tools. It should support Blue, Red, and Purple team work. This is the owner's product direction, not a claim of existing workflow coverage. Account discovery is one task within that scope. Existing choices about zero-auth sources, handwritten CSS, language, and interface are inputs to review rather than requirements for the future product.
 
 Recommendation: decide the operating model before changing languages. Distinguish source collection, specialist-tool execution, evidence normalization, and analysis. The research should establish which responsibilities Basalt should own and which established tools it should use. This is a product and maintenance decision, not a module-count contest.
 
@@ -71,6 +71,68 @@ WhatsMyName's closure is a concrete maintenance concern, not merely a missing re
 
 Both concern active reconnaissance. They are engineering references, not passive OSINT equivalents or evidence that Rust supplies replacements for the full tool inventory.
 
+## Agent-driven operation and the REA reference
+
+The owner wants AI to perform more of the investigation work. The key architectural distinction is between a toolkit an existing agent can operate and a product that embeds its own autonomous agent runtime. Those choices have different maintenance costs and do not imply a language change.
+
+[REA](https://github.com/morluto/rea) is a reference for the former. Its [binary composition](https://github.com/morluto/rea/blob/main/src/composition/binary.ts) gives CLI and MCP adapters the same application services, provider selection, and Evidence semantics. CLI invocations and persistent MCP sessions still have different lifecycles. The external agent chooses investigative follow-ups; [guided workflows](https://github.com/morluto/rea/blob/main/src/application/GuidedWorkflowAccess.ts) expose prompts rather than an embedded reasoning loop.
+
+REA's [tool contract](https://github.com/morluto/rea/blob/main/src/contracts/toolContractTypes.ts) includes canonical input/output validation, effects, availability requirements, and provenance. [MCP schema advertisement](https://github.com/morluto/rea/blob/main/docs/reference/mcp-contracts.md) is separate from canonical server validation. Compact advertised schemas are not the full execution contract.
+
+Its [Evidence implementation](https://github.com/morluto/rea/blob/main/src/domain/evidence.ts) records artifact, provider, parameters, results, limitations, locations, and links. Content-derived IDs provide consistency checking, not proof of truth or producer trust. [Capability inventory](https://github.com/morluto/rea/blob/main/src/application/CapabilityInventory.ts) separates advertised tools from executable ones. [Provider contracts](https://github.com/morluto/rea/blob/main/src/application/AnalysisProvider.ts) state capabilities and limitations; provider registration order is not selection policy.
+
+The useful lesson is to make operations discoverable, structured, and evidence-bearing so an agent can operate them. REA does not establish general OSINT coverage or complete Blue/Red/Purple workflows. Its effect annotations and untrusted-content labels are not authorization enforcement. These findings come from source inspection, not a REA installation or runtime test.
+
+## TypeSafe and Jev's possible role
+
+[Jev's agent documentation](https://docs.typesafe.ai/introduction/coding-agents) describes a structured decision model, not a conversational reasoning agent. It can judge supplied state and return values for software to consume. It does not replace the model responsible for open-ended planning, context management, or tool execution.
+
+The current [question types](https://docs.typesafe.ai/primitives) include Choice for finite options, Noul for a yes/no probability, Score for defined ordered criteria, and Box for image location. The [model documentation](https://docs.typesafe.ai/models), checked November 15, lists Jev 1.14 with text/image input and all four types. Older local guidance describing Jev as text-only is out of date. This research did not call the API or measure OSINT accuracy, latency, or cost.
+
+Candidate judgments for later evaluation include classifying supplied findings, ranking already known relevant evidence, or assessing a candidate relationship against a fixed rubric. Exact lookups, scope, allowed operations, state transitions, budgets, and execution belong in code. A reasoning agent can own broader investigation planning. No provider SDK or additional runtime is needed merely to describe that separation.
+
+[Confidence](https://docs.typesafe.ai/confidence) summarizes a distribution and is not proof of correctness or permission to act. TypeSafe's [entity-alignment cookbook](https://docs.typesafe.ai/cookbooks/entity_alignment) demonstrates merge recommendation, review, and no-link outcomes on music catalog records. It does not validate automated person attribution in OSINT. A future evaluation needs representative labelled cases, ambiguous and missing evidence, model/version records, and explicit review outcomes. Typed output guarantees shape, not truth.
+
+## Blue, Red, and Purple team coverage
+
+[NIST's definitions](https://csrc.nist.gov/glossary/term/red_team_blue_team_approach) distinguish adversary simulation from defense. [MITRE](https://attack.mitre.org/resources/get-started/adversary-emulation-and-red-teaming/) describes a common language for red-team operations, defender analytics, and joint evaluation. These roles describe user objectives; they do not require three agent personas or three implementations.
+
+For Basalt, the following is a proposed interpretation of the requested coverage, not an implemented feature list:
+
+- Blue work would use collected intelligence to understand owned exposure, investigate observations, and prioritize defensive follow-up.
+- Red work would use reconnaissance and evidence to support explicitly scoped assessments. OSINT findings alone do not demonstrate exploitability or a successful attack.
+- Purple work would connect a scoped hypothesis or exercise observation to defensive visibility, a resulting change, and a repeatable validation. A red result next to a blue summary does not establish that this loop works.
+
+Whether Basalt stops at OSINT collection and handoff or expands into executing security assessments remains an explicit product boundary to settle. The present scope adds neither attack execution nor detection integrations. Automatic hypothesis generation and evidence collection are distinct from confirmed findings. Agent-generated narratives should retain the source observations and their uncertainty.
+
+## Later entity model and Obsidian-style exploration
+
+The owner proposes a later entity-relationship knowledge model and an Obsidian-style way to explore it. The supplied [ER-model reference](https://de.wikipedia.org/wiki/Entity-Relationship-Modell) concerns representing entities, attributes, and relationships. It is a conceptual reference, not a request to copy a database diagram into the product.
+
+Obsidian's [graph documentation](https://help.obsidian.md/plugins/graph) describes linked notes and a local graph around the active note. Its [internal-link documentation](https://help.obsidian.md/links) describes navigation among notes and files. Those are interaction references. They do not settle Basalt's persistence format, require an Obsidian plugin, or select a graph database.
+
+A useful OSINT interpretation would keep an entity, a source observation about that entity, a claimed relationship, and an analyst or model assessment distinct. For example, two accounts sharing a handle is an observation; a claim that they belong to the same person needs its own evidence and uncertainty. An AI-generated relationship is a hypothesis until supported and evaluated. This is a proposed distinction for the next modeling discussion, not a changed graph schema.
+
+The desired experience is simple entry and gradual exploration of relevant connections with their sources. Whether the later view uses linked dossiers, a local graph, or both remains open. The current backend already stores nodes and edges; that fact alone does not establish the intended knowledge model. No viewer, note storage, ontology, or entity-resolution feature is added in this cleanup.
+
+## Stack structure and simplification
+
+Current responsibilities are distributed across the [Go commands](../cli/cmd/root.go), [application service](../cli/internal/app/service.go), [HTTP API](../cli/internal/api/server.go), [embedded server](../cli/internal/webui/server.go), and React client. There are two main application stacks, Go and TypeScript/React, plus their toolchains and SQLite. The concrete build coupling is [Vite's output](../web/vite.config.ts) into `cli/internal/webui/dist`, followed by Go embedding those assets. Counting languages alone does not explain that coupling.
+
+A simpler direction to evaluate is one backend owning tool execution, persistence, and evidence, with explicit adapters for human and agent clients. A CLI-only product would remove the React build and embedded browser client. Keeping optional clients would preserve interactive inspection but needs clear ownership of protocols and generated assets. These are alternatives, not an approved restructure.
+
+Do not add a separate Python orchestration service, a Rust rewrite, and an agent framework merely to enable AI. An external agent using typed operations, plus bounded Jev judgments where justified, can be evaluated without adding those systems. This is a recommendation to minimize stack growth; it does not choose Go permanently or rule out a measured migration.
+
+## CI and verification cleanup
+
+At the owner's explicit request, this cleanup removes the CI workflow. The corresponding CLI and Web required status checks were removed from main's branch protection and the live setting was read back. Force pushes and branch deletion remain disabled. Dependabot remains configured; its update PRs are separate work.
+
+Before CI removal, CLI and Web passed on the original documentation commit. The advisory vulnerability job reported GO-2026-6859 in the unchanged Go 1.27.3 standard library, with Go 1.27.4 listed as the fix. This cleanup does not fix that finding. Removing CI does not make the dependency state clean. The observed result is retained here to distinguish existing maintenance work from a regression in this change.
+
+Removed a test that only assigned and reread public node fields. Consolidated duplicate JSON shape checks at the output boundary, retaining the metadata assertion. Changed the asset-serving test to compare the actual embedded file instead of bundle text markers. The cancellation test now waits for extraction to start before cancelling instead of sleeping for 100 ms.
+
+Test cleanup focuses on observed redundancy and coupling rather than a target test count. Preserve behavioral checks for persistence, cancellation, concurrency, authentication, network boundaries, parsers, and exported evidence. Local verification remains appropriate to the actual change; the removed workflow is not replaced with another merge gate.
+
 ## Product choices the research leaves open
 
 The strongest candidate for later evaluation is a hybrid: Basalt owns a consistent user experience and evidence handling, uses selected native collectors, and integrates specialist engines where reproducing them has little value. This is an assessment, not a selected architecture or adapter backlog.
@@ -82,6 +144,8 @@ The next product discussion should settle these questions before any implementat
 - Does "one tool" mean one self-contained binary, or one consistent interface that can manage external dependencies?
 - Should the normal workflow run a selected task or automatically expand discoveries? What scope and evidence should authorize another pivot?
 - Are credentialed and paid sources optional parts of the toolkit? The former zero-auth preference is not assumed to remain a requirement.
+- Should existing agents operate Basalt through a tool contract, or should Basalt own a reasoning-agent runtime?
+- Does Blue/Red/Purple coverage mean OSINT support and handoff, or execution of the broader security workflows?
 - Is the primary result an automation-friendly export, an interactive evidence workspace, or both? That answer should decide CLI, TUI, and web priorities.
 - Which concrete requirement would make a Rust migration worth the compatibility and validation work?
 - Does broad downstream reuse justify MIT or Apache-2.0 after the rights review?

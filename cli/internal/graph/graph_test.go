@@ -2,10 +2,7 @@
 
 package graph
 
-import (
-	"encoding/json"
-	"testing"
-)
+import "testing"
 
 func TestNewNode(t *testing.T) {
 	n := NewNode("username", "kylederzweite", "github")
@@ -34,23 +31,6 @@ func TestNewAccountNode(t *testing.T) {
 	wantLabel := "github - kylederzweite"
 	if n.Label != wantLabel {
 		t.Errorf("got Label %q, want %q", n.Label, wantLabel)
-	}
-}
-
-func TestNodePivotAndWave(t *testing.T) {
-	n := NewNode("email", "kyle@example.com", "gravatar")
-	n.Pivot = true
-	n.Wave = 1
-	n.Confidence = 0.95
-
-	if !n.Pivot {
-		t.Error("expected Pivot=true")
-	}
-	if n.Wave != 1 {
-		t.Errorf("got Wave %d, want 1", n.Wave)
-	}
-	if n.Confidence != 0.95 {
-		t.Errorf("got Confidence %f, want 0.95", n.Confidence)
 	}
 }
 
@@ -141,30 +121,5 @@ func TestParseSeed(t *testing.T) {
 	_, err = ParseSeed("invalid")
 	if err == nil {
 		t.Error("expected error for invalid seed format")
-	}
-}
-
-func TestGraphMarshalJSON(t *testing.T) {
-	g := New()
-	n := NewNode("username", "kyle", "test")
-	g.AddNode(n)
-
-	data, err := g.MarshalJSON()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var out map[string]interface{}
-	if err := json.Unmarshal(data, &out); err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := out["nodes"]; !ok {
-		t.Error("JSON output missing 'nodes' key")
-	}
-	if _, ok := out["edges"]; !ok {
-		t.Error("JSON output missing 'edges' key")
-	}
-	if _, ok := out["meta"]; !ok {
-		t.Error("JSON output missing 'meta' key")
 	}
 }

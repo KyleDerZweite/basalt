@@ -116,12 +116,7 @@ go test ./...
 
 Dependabot opens update PRs for Go modules, pnpm-managed npm packages, and GitHub Actions each week.
 
-This repo does not auto merge those PRs. Each update needs human review and green `CLI` and `Web` checks before merge. The `Vulnerability scan` job also runs on pull requests as an advisory check.
-
-Recommended branch protection on `main`:
-
-- require the `CLI` and `Web` status checks before merging
-- require one human review for dependency and non trivial changes
+Dependency updates require review before merge. As of November 15, 2026, automated CI is disabled and merges do not require CI status checks. Run the local checks relevant to a change and record their results in its pull request.
 
 ## Legal
 
