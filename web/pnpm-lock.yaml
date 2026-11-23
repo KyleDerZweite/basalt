@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@chenglou/pretext':
-        specifier: ^0.0.7
-        version: 0.0.7
+        specifier: ^1.0.0
+        version: 1.0.0
       lucide-react:
         specifier: ^1.45.0
         version: 1.45.0(react@19.3.0)
@@ -42,8 +42,8 @@ importers:
 
 packages:
 
-  '@chenglou/pretext@0.0.7':
-    resolution: {integrity: sha512-FV5hj3fGqpBlzbANUbR+s+6XuNRrghVVyuNs33zdH2SzU7MvK+7GlW6xREjDCreixKbexEn7OEkDgAFeWuu5Hg==}
+  '@chenglou/pretext@1.0.0':
+    resolution: {integrity: sha512-BxKiDMxWJhyzL8asvcgg3T9YnUU7OUFsKO8oRaR2SYAPX4Sh2wM9gqTBjrBaZ4fnl84cEQ8czC0Q1M83z3chsA==}
 
   '@oxc-project/types@0.155.0':
     resolution: {integrity: sha512-SeE8JPwW1xs1tHeNycjUtUBdhorRa8o4jlvjwk49R7/Z291i+4DQa7JJIgOm/TaYQZx+QrPQbVJ/9c8dMIZN8Q==}
@@ -506,7 +506,7 @@ packages:
 
 snapshots:
 
-  '@chenglou/pretext@0.0.7': {}
+  '@chenglou/pretext@1.0.0': {}
 
   '@oxc-project/types@0.155.0': {}
 
