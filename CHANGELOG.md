@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Removed
+- Built-in browser workspace and its launch command.
+
 ## [0.3.0] - 2026-04-07
 
 ### Added

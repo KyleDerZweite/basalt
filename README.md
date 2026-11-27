@@ -1,16 +1,13 @@
 # Basalt
 
-Basalt is a Go CLI for relational OSINT on identifiers you own or are explicitly authorized to investigate. It runs focused modules against usernames, emails, and domains, then builds a graph of accounts, links, infrastructure, and identity signals.
+> [!NOTE]
+> **Status: On Hold / Experimental.** This project is currently paused while I rethink its direction. The Go CLI and local HTTP API work as an early prototype, but active development is on hold and expect breaking changes if it resumes.
 
-Basalt also includes:
+Basalt is a Go CLI and local HTTP API for self-lookup and authorized OSINT. It scans usernames, emails, and domains and builds a graph of accounts, links, infrastructure, and identity signals. You can store targets and aliases for repeat scans and export results as JSON or CSV.
 
-- a local product API via `basalt serve`
-- a local browser workspace via `basalt web`
-- persistent targets and aliases for repeated investigations
+## Build
 
-Unlike spray-and-pray username checkers, Basalt uses per-module extraction logic, health checks, confidence scoring, and graph pivots.
-
-## Install
+Use Go 1.27.3 or newer.
 
 ```bash
 git clone https://github.com/KyleDerZweite/basalt.git
@@ -18,69 +15,42 @@ cd basalt/cli
 go build -o basalt .
 ```
 
-## Quick Start
+## Quick start
+
+Run these examples from `basalt/cli` after building.
 
 ```bash
 # Scan a username
-basalt scan -u kylederzweite
+./basalt scan -u kylederzweite
 
 # Scan multiple seeds
-basalt scan -u kyle -e kyle@example.com -d kylehub.dev
+./basalt scan -u kyle -e kyle@example.com -d kylehub.dev
 
 # Export results
-basalt scan -u kyle --export json --export csv
-
-# Run the local API
-basalt serve
-
-# Run the local browser workspace
-basalt web
+./basalt scan -u kyle --export json --export csv
 
 # Create and reuse a stored target
-basalt target create kyle --name "Kyle"
-basalt target alias add kyle username:kylederzweite --primary
-basalt scan --target kyle
+./basalt target create kyle --name "Kyle"
+./basalt target alias add kyle username:kylederzweite --primary
+./basalt scan --target kyle
+
+# Run the local API
+./basalt serve
 ```
 
-Use `basalt --help` or `basalt <command> --help` for the current CLI surface.
+Use `./basalt --help` or `./basalt <command> --help` for the current CLI surface.
 
-## Core Commands
+## Core commands
 
 - `basalt scan` runs an ad hoc scan from username, email, and domain seeds
 - `basalt target` manages persistent targets and curated aliases
 - `basalt serve` runs the local HTTP API for local clients and integrations
-- `basalt web` runs the built-in browser workspace on the same local backend
 - `basalt version` prints the current build version
 
 ## Docs
 
 - [Local API](docs/local-api.md)
-- [Web Workspace](docs/web-ui.md)
 - [OSINT toolkit research and open decisions](docs/osint-toolkit-research.md)
-
-The README intentionally stays high level. API endpoints, workspace behavior, and backlog details live in `docs/`.
-
-## Modules
-
-Basalt currently ships with 38 modules.
-
-| Category | Modules | Seed Types |
-|----------|---------|------------|
-| Identity | Gravatar, Keybase | email, username |
-| Dev/Tech | GitHub, GitLab, Codeberg, Codeforces, StackExchange, Docker Hub, DEV.to, Hacker News | username, email |
-| Social | Reddit, YouTube, Twitch, Discord, Instagram, TikTok, Medium, Telegram, Wattpad | username |
-| Link-in-Bio | Linktree, Beacons, Carrd, Bento | username |
-| Comms | Matrix | username |
-| Gaming | Steam, OP.GG, Spotify, Chess.com, Lichess, MyAnimeList, Roblox | username |
-| Productivity | Trello | username |
-| Domain | WHOIS/RDAP, DNS/CT, Security.txt | domain |
-| Infrastructure | Shodan, Wayback Machine, IPinfo | domain |
-
-Modules self-report health before scanning:
-
-- `healthy`: normal operation
-- `degraded`: works, but confidence is reduced
-- `offline`: skipped
 
 ## Configuration
 
@@ -96,27 +66,21 @@ Local runtime data is stored in `~/.basalt` by default unless `--data-dir` is ov
 
 ## Development
 
-Use Go 1.27.3 or newer. For web development, use the Node.js version in
-`web/.node-version` and pnpm 10.29.2, pinned in `web/package.json`.
-Node.js 22 includes Corepack, which selects that pnpm version.
-
 ```bash
-cd web
-corepack enable pnpm
-pnpm install --frozen-lockfile
-pnpm build
-
-cd ../cli
+cd cli
 go build ./...
 go vet ./...
 go test ./...
 ```
 
-## Dependency updates
+## Related open-source tools
 
-Dependabot opens update PRs for Go modules, pnpm-managed npm packages, and GitHub Actions each week.
+If you are looking for mature, actively maintained OSINT tools today:
 
-Dependency updates require review before merge. As of November 15, 2026, automated CI is disabled and merges do not require CI status checks. Run the local checks relevant to a change and record their results in its pull request.
+- [Maigret](https://github.com/soxoj/maigret) — Username search across thousands of sites with report generation
+- [Sherlock](https://github.com/sherlock-project/sherlock) — Classic username lookup across social networks
+- [sn0int](https://github.com/kpcyrd/sn0int) — Semi-automatic OSINT framework and package manager written in Rust
+- [SpiderFoot](https://github.com/smicallef/spiderfoot) — Automated OSINT collection and reconnaissance framework
 
 ## Legal
 
