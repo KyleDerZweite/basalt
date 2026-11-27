@@ -1,6 +1,6 @@
 # Basalt Local API
 
-Basalt now exposes a local product API through:
+Start the local HTTP API with `basalt serve`. To run it from source:
 
 ```bash
 cd cli
@@ -8,15 +8,6 @@ go run . serve
 ```
 
 Default address: `http://127.0.0.1:8787`
-
-If you want the browser-based product surface instead of a headless API, use:
-
-```bash
-cd cli
-go run . web
-```
-
-That mounts the same API under `/api/*` and serves the local UI from the same origin.
 
 Managed serve mode examples:
 
@@ -27,14 +18,13 @@ go run . serve --status
 go run . serve --stop
 ```
 
-For local clients and browser-based frontends, prefer:
+Local clients can ask for an available port, require a bearer token, and read the address from startup JSON:
 
 ```bash
 cd cli
 go run . serve \
   --listen 127.0.0.1:0 \
   --auth-token local-dev-token \
-  --allow-origin http://localhost:5173 \
   --print-listen-json
 ```
 
@@ -180,5 +170,4 @@ All local data is stored in `~/.basalt` by default:
 - Clients should use REST for settings, history, and results, and SSE for scan progress.
 - Local clients should use `--listen 127.0.0.1:0` rather than hard-coding a port.
 - Managed background mode is per `--data-dir`, so separate data dirs can run separate local APIs.
-- `basalt web` is the recommended built-in browser client and uses the same API contract without requiring cross-origin requests.
-- `GET /api/scans/{id}/workspace` is the preferred browser endpoint for the investigation graph and top-level scan summary.
+- `GET /api/scans/{id}/workspace` returns the investigation graph and top-level scan summary.

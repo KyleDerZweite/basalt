@@ -22,7 +22,6 @@ const maxRequestBodySize = 1 << 20
 // Options configures the local HTTP API.
 type Options struct {
 	AuthToken      string
-	AuthCookieName string
 	AllowedOrigins []string
 }
 
@@ -31,7 +30,6 @@ func NewServer(service *app.Service, opts Options) http.Handler {
 	server := &Server{
 		service:        service,
 		authToken:      strings.TrimSpace(opts.AuthToken),
-		authCookieName: strings.TrimSpace(opts.AuthCookieName),
 		allowedOrigins: normalizeOrigins(opts.AllowedOrigins),
 	}
 
@@ -50,7 +48,6 @@ func NewServer(service *app.Service, opts Options) http.Handler {
 type Server struct {
 	service        *app.Service
 	authToken      string
-	authCookieName string
 	allowedOrigins []string
 }
 
@@ -480,26 +477,13 @@ func (s *Server) withAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		token, err := s.requestToken(r)
+		token, err := bearerToken(r)
 		if err != nil || subtle.ConstantTimeCompare([]byte(token), []byte(s.authToken)) != 1 {
 			writeError(w, http.StatusUnauthorized, errors.New("missing or invalid authentication token"))
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
-}
-
-func (s *Server) requestToken(r *http.Request) (string, error) {
-	if token, err := bearerToken(r); err == nil {
-		return token, nil
-	}
-	if s.authCookieName != "" {
-		cookie, err := r.Cookie(s.authCookieName)
-		if err == nil {
-			return cookie.Value, nil
-		}
-	}
-	return "", errors.New("missing authentication token")
 }
 
 func (s *Server) withCORS(next http.Handler) http.Handler {
@@ -553,7 +537,7 @@ func isWriteMethod(method string) bool {
 func decodeJSONBody(w http.ResponseWriter, r *http.Request, target any) error {
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
 	decoder := json.NewDecoder(r.Body)
-	// Keep mutation payloads strict. Frontend request objects must use the exact
+	// Keep mutation payloads strict. Client request objects must use the exact
 	// JSON field names declared by their corresponding app types.
 	decoder.DisallowUnknownFields()
 	return decoder.Decode(target)

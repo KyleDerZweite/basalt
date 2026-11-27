@@ -43,8 +43,8 @@ type serveStartupInfo struct {
 
 var serveCmd = &cobra.Command{
 	Use:   "serve",
-	Short: "Run the local Basalt product API",
-	Long: `Run the local Basalt API used by local clients and browser-based UIs.
+	Short: "Run the local Basalt HTTP API",
+	Long: `Run the Basalt HTTP API for local clients and integrations.
 
 The server binds to localhost by default and persists scans, settings, and events
 inside the Basalt data directory.`,

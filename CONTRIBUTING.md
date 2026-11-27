@@ -19,24 +19,13 @@ Thanks for your interest in contributing to Basalt! This document covers the pro
 
 ## Development
 
-All Go source lives under `cli/`, all web UI source under `web/`. See [README.md](README.md) for build commands, [the local API guide](docs/local-api.md), and [the web workspace guide](docs/web-ui.md) for current behavior.
-Use Go 1.27.3 or newer. For the frontend, use the Node.js version in
-`web/.node-version` and pnpm 10.29.2 from `web/package.json`.
-Run `corepack enable pnpm` with Node.js 22 to select the pinned pnpm version.
+All Go source lives under `cli/`. Use Go 1.27.3 or newer. See [README.md](README.md) for CLI usage and the [local API guide](docs/local-api.md) for HTTP endpoints.
 
 ```bash
-# Go backend
 cd cli
-go build ./...        # build
-go test ./...         # test
-go vet ./...          # lint
-
-# Web frontend
-cd ../web
-pnpm install --frozen-lockfile # install locked dependencies
-pnpm dev              # dev server
-pnpm build            # production build
-pnpm typecheck        # type check
+go build ./...
+go vet ./...
+go test ./...
 ```
 
 ## Adding a Module
@@ -51,16 +40,7 @@ Each module lives in its own package under `cli/internal/modules/<name>/` and im
 
 Follow the pattern of existing modules (e.g., `twitch`, `github`). Register your module in `cli/internal/app/modules.go`.
 
-Test the behavior affected by a change. For source adapters, use local HTTP fixtures for meaningful parsing, not-found, and failure cases. A fixed list of test function names is not required. Avoid checks that only repeat assignments or depend on generated bundle internals.
-
-## Working on the Web UI
-
-The frontend is a React 19 + TypeScript SPA in `web/`. Key conventions:
-
-- Icons come from `lucide-react`. Import individual icons, not the barrel export.
-- All styling is plain CSS in `web/src/index.css` using CSS custom properties. No Tailwind, no CSS-in-JS.
-- Components live in `web/src/components/`, pages in `web/src/pages/`.
-- Run `pnpm build` after changes to update the assets embedded in the Go binary.
+Test the behavior affected by a change. For source adapters, use local HTTP fixtures for meaningful parsing, not-found, and failure cases. A fixed list of test function names is not required. Avoid checks that only repeat assignments.
 
 ## Submitting Changes
 
@@ -82,7 +62,7 @@ Open an issue at [github.com/KyleDerZweite/basalt/issues](https://github.com/Kyl
 - What you expected to happen
 - What actually happened
 - Steps to reproduce
-- Basalt version (`basalt --version`)
+- Basalt version (`basalt version`)
 
 ## Code of Conduct
 

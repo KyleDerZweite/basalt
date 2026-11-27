@@ -20,7 +20,7 @@ As observed through GitHub on November 15, seven dependency PRs remain open: [Vi
 
 ## Basalt's current operating model
 
-The [CLI scan command](../cli/cmd/scan.go) and [HTTP API](../cli/internal/api/server.go) share the [application service](../cli/internal/app/service.go). The service owns scans, cancellation, SQLite persistence, and events. The browser is a client of the same backend.
+The [CLI scan command](../cli/cmd/scan.go) and [HTTP API](../cli/internal/api/server.go) share the [application service](../cli/internal/app/service.go). The service owns scans, cancellation, SQLite persistence, and events. Basalt currently ships the Go CLI and local HTTP API; the bundled Web UI was removed in Phase 1.
 
 The [module contract](../cli/internal/modules/module.go) accepts a graph node and a concrete HTTP client and returns graph nodes and edges. [Registration](../cli/internal/app/modules.go) imports and constructs Go packages explicitly. This is a compiled extractor system, not runtime plugin discovery or a general external-tool runner. The [walker](../cli/internal/walker/walker.go) dispatches typed nodes and controls concurrency, timeouts, deduplication, and progress.
 
@@ -117,9 +117,9 @@ The desired experience is simple entry and gradual exploration of relevant conne
 
 ## Stack structure and simplification
 
-Current responsibilities are distributed across the [Go commands](../cli/cmd/root.go), [application service](../cli/internal/app/service.go), [HTTP API](../cli/internal/api/server.go), [embedded server](../cli/internal/webui/server.go), and React client. There are two main application stacks, Go and TypeScript/React, plus their toolchains and SQLite. The concrete build coupling is [Vite's output](../web/vite.config.ts) into `cli/internal/webui/dist`, followed by Go embedding those assets. Counting languages alone does not explain that coupling.
+As of November 15, 2026, responsibilities were distributed across the [Go commands](../cli/cmd/root.go), [application service](../cli/internal/app/service.go), [HTTP API](../cli/internal/api/server.go), embedded server, and React client. There were two main application stacks, Go and TypeScript/React, plus their toolchains and SQLite. Vite generated the assets that the Go binary embedded. Counting languages alone does not explain that coupling.
 
-A simpler direction to evaluate is one backend owning tool execution, persistence, and evidence, with explicit adapters for human and agent clients. A CLI-only product would remove the React build and embedded browser client. Keeping optional clients would preserve interactive inspection but needs clear ownership of protocols and generated assets. These are alternatives, not an approved restructure.
+The current direction is one Go backend owning tool execution, persistence, and evidence, with explicit adapters for human and agent clients. Phase 1 removed the React build and embedded browser client. Future client and viewer choices (such as a Markdown/Obsidian vault or optional static viewer) remain open for subsequent phases.
 
 Do not add a separate Python orchestration service, a Rust rewrite, and an agent framework merely to enable AI. An external agent using typed operations, plus bounded Jev judgments where justified, can be evaluated without adding those systems. This is a recommendation to minimize stack growth; it does not choose Go permanently or rule out a measured migration.
 
@@ -160,7 +160,7 @@ A migration decision should name its actual benefit, such as an unmet memory con
 
 CLI-only would remove frontend build and browser maintenance, but also remove interactive evidence inspection. A TUI is another application to build and maintain. [Ratatui backends](https://ratatui.rs/concepts/backends/) and [event handling](https://ratatui.rs/concepts/event-handling/) address terminal mechanics, not a finished investigation workflow. A TUI does not inherently require rewriting the backend or using Rust.
 
-The current [React client](../web/src/lib/api.ts) consumes JSON and [SSE events](../web/src/hooks/useScanEvents.ts). [Vite](../web/vite.config.ts) outputs assets into the embedded Go directory. These contracts allow interface and backend choices to be evaluated separately. Keeping the web UI is a recommendation pending a task-based comparison, not a settled product constraint.
+As of November 15, 2026, the React client consumed JSON and SSE events, and Vite generated assets for the embedded server; at that time, keeping the web UI was recommended pending a task-based comparison. Phase 1 subsequently removed the bundled Web UI so Basalt currently ships only the Go CLI and local HTTP API, leaving future client or viewer choices open.
 
 ## License decision
 
