@@ -1,8 +1,9 @@
 # Basalt
 
-Basalt is a Go CLI and local HTTP API for self-lookup and authorized OSINT. It scans usernames, emails, and domains and builds a graph of accounts, links, infrastructure, and identity signals. You can store targets and aliases for repeat scans and export results as JSON or CSV.
+> [!NOTE]
+> **Status: On Hold / Experimental.** This project is currently paused while I rethink its direction. The Go CLI and local HTTP API work as an early prototype, but active development is on hold and expect breaking changes if it resumes.
 
-Basalt is moving toward an OSINT and digital footprint toolkit that agents can operate. Today, scripts and local clients can use the CLI and HTTP API.
+Basalt is a Go CLI and local HTTP API for self-lookup and authorized OSINT. It scans usernames, emails, and domains and builds a graph of accounts, links, infrastructure, and identity signals. You can store targets and aliases for repeat scans and export results as JSON or CSV.
 
 ## Build
 
@@ -72,11 +73,14 @@ go vet ./...
 go test ./...
 ```
 
-## Dependency updates
+## Related open-source tools
 
-Dependabot opens update PRs for Go modules and GitHub Actions each week.
+If you are looking for mature, actively maintained OSINT tools today:
 
-Dependency updates require review before merge. As of November 15, 2026, automated CI is disabled and merges do not require CI status checks. Run the local checks relevant to a change and record their results in its pull request.
+- [Maigret](https://github.com/soxoj/maigret) — Username search across thousands of sites with report generation
+- [Sherlock](https://github.com/sherlock-project/sherlock) — Classic username lookup across social networks
+- [sn0int](https://github.com/kpcyrd/sn0int) — Semi-automatic OSINT framework and package manager written in Rust
+- [SpiderFoot](https://github.com/smicallef/spiderfoot) — Automated OSINT collection and reconnaissance framework
 
 ## Legal
 
